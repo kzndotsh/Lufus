@@ -42,7 +42,7 @@ class AboutWindow(QDialog):
         layout.addWidget(self.about_text)
         self.setLayout(layout)
 
-class FlashWorker(QThread): # thi is so the ui dont freeze when flashing
+class FlashWorker(QThread): # this is so the ui dont freeze when flashing
     finished = pyqtSignal(bool)
     progress = pyqtSignal(str)
     def __init__(self, iso_path: str, mount_path: str):
@@ -74,7 +74,7 @@ class Rufus(QMainWindow):
         super().__init__()
         self.usb_devices = usb_devices or {}
         self.setWindowTitle("Rufus")
-        self.setFixedSize(640, 780) 
+        self.setFixedSize(640, 700) 
         
         self.setStyleSheet("""
             QMainWindow {
@@ -285,7 +285,7 @@ class Rufus(QMainWindow):
         lbl_image.setStyleSheet("font-weight: normal; font-size: 9pt; padding-bottom: 2px;")
         self.combo_image_option = QComboBox()
         self.combo_image_option.addItem("Standard Windows installation")
-        self.combo_image_option.addItem("Windows To Go")
+        #self.combo_image_option.addItem("Windows To Go")
         self.combo_image_option.addItem("Standard Linux")
         self.combo_image_option.currentTextChanged.connect(self.update_image_option)
 
@@ -321,12 +321,6 @@ class Rufus(QMainWindow):
         
         main_layout.addLayout(grid_part)
         
-        main_layout.addSpacing(5)
-
-        lbl_adv_drive = QLabel("▼ Show advanced drive properties")
-        lbl_adv_drive.setObjectName("linkLabel")
-        main_layout.addWidget(lbl_adv_drive)
-        
         main_layout.addSpacing(15)
 
         main_layout.addLayout(self.create_header("Format Options"))
@@ -350,10 +344,8 @@ class Rufus(QMainWindow):
         lbl_fs = QLabel("File system")
         lbl_fs.setStyleSheet("font-weight: normal; font-size: 9pt;")
         self.combo_fs = QComboBox()
-        self.combo_fs.addItem("NTFS")
-        self.combo_fs.addItem("FAT32")
-        self.combo_fs.addItem("exFAT")
-        self.combo_fs.addItem("ext4")
+        self.all_fs_options = ["NTFS", "FAT32", "exFAT", "ext4", "UDF"]
+        self.combo_fs.addItems(self.all_fs_options)
         self.combo_fs.currentTextChanged.connect(self.updateFS)
         
         lbl_cluster = QLabel("Cluster size")
@@ -368,10 +360,6 @@ class Rufus(QMainWindow):
         grid_fmt.addWidget(self.combo_cluster, 1, 2)
         
         main_layout.addLayout(grid_fmt)
-
-        lbl_adv_fmt = QLabel("▲ Hide advanced format options")
-        lbl_adv_fmt.setObjectName("linkLabel")
-        main_layout.addWidget(lbl_adv_fmt)
 
         self.chk_quick = QCheckBox("Quick format")
         self.chk_quick.setChecked(True)
@@ -470,6 +458,8 @@ class Rufus(QMainWindow):
         self.setStatusBar(self.statusBar)
         self.statusBar.showMessage("", 0)
 
+
+
     def updateFS(self):
         states.currentFS = self.combo_fs.currentIndex()
         # print(f"Global state updated to: {states.currentFS}")
@@ -477,7 +467,23 @@ class Rufus(QMainWindow):
     def update_image_option(self):
         states.image_option = self.combo_image_option.currentIndex()
         # print(f"Global state updated to: {states.image_option}")
+        self._update_filesystem_options()
     
+    def _update_filesystem_options(self):
+        states.image_option = self.combo_image_option.currentText()
+        self.combo_fs.blockSignals(True)
+        if states.image_option == "Standard Linux":
+            self.combo_fs.clear()
+            self.combo_fs.addItem("UDF")
+            # print("UDF Only")
+        else:
+            self.combo_fs.clear()
+            self.combo_fs.addItems(self.all_fs_options)
+            self.combo_fs.setCurrentText("NTFS")
+            # print("windows options")
+        self.combo_fs.blockSignals(False)
+        self.updateFS()
+
     def update_partition_scheme(self):
         states.partition_scheme = self.combo_partition.currentIndex()
         # print(f"Global state updated to: {states.partition_scheme}")
@@ -603,7 +609,7 @@ class Rufus(QMainWindow):
         #progress bar:3c
         self.flash_worker = FlashWorker(states.iso_path, mount_path)
         self.flash_worker.progress.connect(lambda msg: self.statusBar.showMessage(msg, 0))
-        self.flash_worker.finished.connect(self.on_flash_finished)
+        # self.flash_worker.finished.connect(self.on_flash_finished)
         self.flash_worker.start()
         
 
