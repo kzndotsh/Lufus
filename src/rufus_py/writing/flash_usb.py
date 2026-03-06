@@ -30,7 +30,7 @@ def FlashUSB(iso_path, usb_mount_path) -> bool:
     #     return False
 
     try:
-        dd_args = ["sudo", "dd", f"if={iso_path}", f"of={raw_device}", "bs=4M", "status=progress", "conv=fdatasync"]
+        dd_args = ["dd", f"if={iso_path}", f"of={raw_device}", "bs=4M", "status=progress", "conv=fdatasync"]
         print(f"Flashing USB with command: {' '.join(dd_args)}")
     except FileNotFoundError:
         pkexecNotFound()

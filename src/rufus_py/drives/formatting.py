@@ -29,9 +29,9 @@ def unexpected():
 # UNMOUNT FUNCTION
 def unmount():
     try:
-        subprocess.run(["pkexec", "umount", drive], check=True)
-    except FileNotFoundError:
-        pkexecNotFound()
+        subprocess.run(["umount", drive], check=True)
+    # except FileNotFoundError:
+    #     pkexecNotFound()
     except subprocess.CalledProcessError:
         FormatFail()
     except Exception as e:
@@ -41,9 +41,9 @@ def unmount():
 # MOUNT FUNCTION
 def remount():
     try:
-        subprocess.run(["pkexec", "mount", drive, mount], check=True)
-    except FileNotFoundError:
-        pkexecNotFound()
+        subprocess.run(["mount", drive, mount], check=True)
+    # except FileNotFoundError:
+    #     pkexecNotFound()
     except subprocess.CalledProcessError:
         FormatFail()
     except Exception as e:
@@ -61,9 +61,9 @@ def volumecustomlabel():
     # 3. change the label using the command specific for that file type
     if fs_type==0:
         try:
-            subprocess.run(["pkexec", "ntfslabel", drive, newlabel], check=True)
-        except FileNotFoundError:
-            pkexecNotFound()
+            subprocess.run(["ntfslabel", drive, newlabel], check=True)
+        # except FileNotFoundError:
+        #     pkexecNotFound()
         except subprocess.CalledProcessError:
             FormatFail()
         except Exception as e:
@@ -72,9 +72,9 @@ def volumecustomlabel():
             unexpected()
     elif fs_type==1:
         try:
-            subprocess.run(["pkexec", "fatlabel", drive, newlabel], check=True)
-        except FileNotFoundError:
-            pkexecNotFound()
+            subprocess.run(["fatlabel", drive, newlabel], check=True)
+        # except FileNotFoundError:
+        #     pkexecNotFound()
         except subprocess.CalledProcessError:
             FormatFail()
         except Exception as e:
@@ -83,9 +83,9 @@ def volumecustomlabel():
             unexpected()
     elif fs_type==2:
         try:
-            subprocess.run(["pkexec", "fatlabel", drive, newlabel], check=True)
-        except FileNotFoundError:
-            pkexecNotFound()
+            subprocess.run(["fatlabel", drive, newlabel], check=True)
+        # except FileNotFoundError:
+        #     pkexecNotFound()
         except subprocess.CalledProcessError:
             FormatFail()
         except Exception as e:
@@ -94,9 +94,9 @@ def volumecustomlabel():
             unexpected()
     elif fs_type==3:
         try:
-            subprocess.run(["pkexec", "e2label", drive, newlabel], check=True)
-        except FileNotFoundError:
-            pkexecNotFound()
+            subprocess.run(["e2label", drive, newlabel], check=True)
+        # except FileNotFoundError:
+        #     pkexecNotFound()
         except subprocess.CalledProcessError:
             FormatFail()
         except Exception as e:
@@ -125,8 +125,8 @@ def cluster():
             cluster1 = 8192
         else:
             print("wtf is the cluster size bro?")
-    except FileNotFoundError:
-        pkexecNotFound()
+    # except FileNotFoundError:
+    #     pkexecNotFound()
     except subprocess.CalledProcessError:
         FormatFail()
     except Exception as e:
@@ -138,8 +138,8 @@ def cluster():
         # res2 = subprocess.run(["pkexec", "blockdev", "--getss", drive], capture_output=True, text=True, check=True)
         # cluster2 = int(res2.stdout.strip())
         cluster2 = 512
-    except FileNotFoundError:
-        pkexecNotFound()
+    # except FileNotFoundError:
+    #     pkexecNotFound()
     except subprocess.CalledProcessError:
         FormatFail()
     except Exception as e:
@@ -179,10 +179,10 @@ def dskformat():
 
     if fs_type==0:
         try:
-            subprocess.run(["pkexec", "mkfs.ntfs", "-c", str(clusters), "-Q", drive], check=True)
+            subprocess.run(["mkfs.ntfs", "-c", str(clusters), "-Q", drive], check=True)
             print("success format to ntfs!")
-        except FileNotFoundError:
-            pkexecNotFound()
+        # except FileNotFoundError:
+        #     pkexecNotFound()
         except subprocess.CalledProcessError:
             FormatFail()
         except Exception as e:
@@ -191,10 +191,10 @@ def dskformat():
             unexpected()
     elif fs_type==1:
         try:
-            subprocess.run(["pkexec", "mkfs.vfat", "-s", str(sectors), "-F", "32", drive], check=True)
+            subprocess.run(["mkfs.vfat", "-s", str(sectors), "-F", "32", drive], check=True)
             print("success format to fat32!")
-        except FileNotFoundError:
-            pkexecNotFound()
+        # except FileNotFoundError:
+        #     pkexecNotFound()
         except subprocess.CalledProcessError:
             FormatFail()
         except Exception as e:
@@ -203,10 +203,10 @@ def dskformat():
             unexpected()
     elif fs_type==2:
         try:
-            subprocess.run(["pkexec", "mkfs.exfat", "-b", str(clusters), drive], check=True)
+            subprocess.run(["mkfs.exfat", "-b", str(clusters), drive], check=True)
             print("success format to exFAT!")
-        except FileNotFoundError:
-            pkexecNotFound()
+        # except FileNotFoundError:
+        #     pkexecNotFound()
         except subprocess.CalledProcessError:
             FormatFail()
         except Exception as e:
@@ -215,10 +215,10 @@ def dskformat():
             unexpected()
     elif fs_type==3:
         try:
-            subprocess.run(["pkexec", "mkfs.ext4", "-b", str(clusters), drive], check=True)
+            subprocess.run(["mkfs.ext4", "-b", str(clusters), drive], check=True)
             print("success format to ext4!")
-        except FileNotFoundError:
-            pkexecNotFound()
+        # except FileNotFoundError:
+        #     pkexecNotFound()
         except subprocess.CalledProcessError:
             FormatFail()
         except Exception as e:
@@ -228,3 +228,14 @@ def dskformat():
     else:
         unexpected()
     # REMOUNT
+
+def drive_repair():
+    raw_device = drive.rstrip("0123456789")
+    cmd = ["sfdisk", raw_device]
+    try:
+        subprocess.run(["umount", drive], check=True)
+        subprocess.run(cmd, input=b",,0c;\n", check=True)
+        subprocess.run(["mkfs.vfat", "-F", "32", "-n", "REPAIRED", drive], check=True)
+        print("SUCCESSFULLY REPAIRED DRIVE (FAT32)")
+    except: # Add different error handling 
+        print("COULDN'T REPAIR DRIVE")
