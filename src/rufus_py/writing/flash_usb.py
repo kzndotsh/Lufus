@@ -41,7 +41,6 @@ def FlashUSB(iso_path, usb_mount_path) -> bool:
                 return flash_windows(raw_device, iso_path)
             
         dd_args = [
-            "sudo",
             "dd",
             f"if={iso_path}",
             f"of={raw_device}",
@@ -50,7 +49,7 @@ def FlashUSB(iso_path, usb_mount_path) -> bool:
             "conv=fdatasync"
         ]
         
-        print(f"Flashing with dd: {' '.join(dd_args)}")
+        print(f"Flashing with dd: {" ".join(dd_args)}")
         subprocess.run(dd_args, check=True)
 
         print(f"Successfully flashed {iso_path} to {raw_device}")

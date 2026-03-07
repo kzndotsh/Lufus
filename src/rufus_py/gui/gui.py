@@ -788,8 +788,30 @@ class Rufus(QMainWindow):
         self.statusBar.showMessage("Ready", 0)
     
     def start_process(self):
+        states.DN = self.combo_device.currentData() or ""
         if states.image_option == 0: # WINDOWS NOT YET DONE
-            pass
+            if states.currentflash == 0: # 0 is iso?
+                if not getattr(states, 'iso_path', '') or not Path(states.iso_path).exists():
+                    QMessageBox.warning(self, "No Image", "Please select a valid installation file first.")
+                    return
+                mount_path = self.get_selected_mount_path()
+                if not mount_path:
+                    QMessageBox.warning(self, "No Device", "Please select a USB device first.")
+                    return
+
+                self.btn_start.setEnabled(False)
+                self.btn_cancel.setEnabled(True)
+                self.progress_bar.setValue(0)
+                self.progress_bar.setFormat("Preparing...")
+                self.statusBar.showMessage("Flashing...", 0)
+
+                self.flash_worker = FlashWorker(states.iso_path, mount_path)
+                self.flash_worker.progress.connect(lambda msg: self.statusBar.showMessage(msg, 0))
+                self.flash_worker.finished.connect(self.on_flash_finished)
+                self.flash_worker.start()
+
+                self.log_message(f"Starting Windows flash process: {states.iso_path} -> {mount_path}")
+
         elif states.image_option == 1: # LINUX
             if states.currentflash == 0: # DD METHOD
                 ### FLASHING
