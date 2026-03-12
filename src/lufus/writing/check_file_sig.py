@@ -104,7 +104,7 @@ def check_sha256(file_path: str, expected_hash: str) -> bool:
     bytes_read = 0
     try:
         with p.open("rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):  # 1MB chunks
                 sha256.update(chunk)
                 bytes_read += len(chunk)
         calculated_hash = sha256.hexdigest()

@@ -17,6 +17,11 @@ def is_windows_iso(iso_path: str) -> bool:
                 "sources/install.esd",
                 "sources\\install.wim",
                 "sources\\install.esd",
+                "base.pkg",  # macOS
+                "basesystem.dmg",  # macOS
+                "boot.catalog",  # Common for many ISOs including BSD
+                "boot/kernel/kernel",  # FreeBSD
+                "boot/loader",  # BSD
             ]
             for marker in markers:
                 if marker in files:

@@ -39,17 +39,20 @@ def FlashUSB(iso_path, raw_device, progress_cb=None, status_cb=None) -> bool:
 
     try:
         iso_size = os.path.getsize(iso_path)
-        _status(f"ISO file size: {iso_size:,} bytes ({iso_size / (1024**3):.2f} GiB)")
+        _status(f"File size: {iso_size:,} bytes ({iso_size / (1024**3):.2f} GiB)")
 
-        _status(f"Validating ISO9660 signature for: {iso_path}")
-        if not check_iso_signature(iso_path):
-            _status(f"ISO signature check FAILED for {iso_path}, aborting flash")
-            return False
-        _status("ISO signature check passed")
+        if iso_path.lower().endswith(".iso"):
+            _status(f"Validating ISO9660 signature for: {iso_path}")
+            if not check_iso_signature(iso_path):
+                _status(f"ISO signature check FAILED for {iso_path}, aborting flash")
+                return False
+            _status("ISO signature check passed")
+        else:
+            _status(f"Not an ISO file ({os.path.basename(iso_path)}), skipping ISO signature check")
 
-        _status(f"Checking if ISO contains Windows installation files...")
+        _status(f"Checking if image contains installation markers...")
         if is_windows_iso(iso_path):
-            _status("Windows ISO confirmed")
+            _status("OS Installation media detected")
             _status(f"Flash mode state: currentflash={states.currentflash}")
 
             if states.currentflash == 0:
@@ -77,7 +80,8 @@ def FlashUSB(iso_path, raw_device, progress_cb=None, status_cb=None) -> bool:
             f"of={raw_device}",
             "bs=4M",
             "status=progress",
-            "conv=fdatasync",
+            "conv=fsync",
+            "oflag=direct",
         ]
 
         _status(f"Spawning dd: {' '.join(dd_args)}")

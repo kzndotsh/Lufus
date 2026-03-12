@@ -23,7 +23,8 @@ lbl_file_system,File system
 lbl_flash_option,Flash option
 lbl_cluster_size,Cluster size
 combo_image_windows,Standard Windows installation
-combo_image_linux,Standard Linux
+combo_image_linux,Standard Linux installation
+combo_image_other,Any Install (DD mode)
 combo_image_format,Only Formatting Mode
 combo_partition_gpt,GPT
 combo_partition_mbr,MBR
@@ -34,7 +35,14 @@ combo_cluster_8192,8192 bytes
 combo_badblocks_1pass,1 Pass
 chk_quick_format,Quick Format
 chk_extended_label,Create Extended Label
-chk_badblocks,Check for Bad Blocks
+chk_bad_blocks,Check for Bad Blocks
+chk_verify_hash,Verify SHA256 checksum
+lbl_expected_hash,Expected SHA256:
+progress_verifying,Verifying Checksum...
+msgbox_verify_fail_title,Verification Failed
+msgbox_verify_fail_body,SHA256 checksum mismatch! The file may be corrupted.
+msgbox_invalid_hash_title,Invalid Hash
+msgbox_invalid_hash_body,The provided SHA256 hash is invalid.
 combo_flash_iso,Iso Mode
 combo_flash_woe,Woe USB
 combo_flash_ventoy,Ventoy
@@ -79,7 +87,7 @@ msgbox_scan_error_title,Scan Error
 msgbox_scan_error_body,Failed to scan for USB devices:
 no_usb_found,No USB devices found
 dlg_select_image_title,Select Disk Image
-dlg_select_image_filter,ISO Images (*.iso);;All Files (*)
+dlg_select_image_filter,"Disk Images (*.iso *.dmg *.img *.bin *.raw);;All Files (*)"
 about_content,"lufus is a disk image writer written in Python for Linux.
 Inspired by the original lufus tool for Windows.
 Version: 1.0.0

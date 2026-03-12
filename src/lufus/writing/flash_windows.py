@@ -4,6 +4,7 @@ import glob
 import tempfile
 import re
 from typing import Optional, Callable
+from lufus.drives import states
 
 
 def run(cmd):
@@ -77,7 +78,7 @@ def _fix_efi_bootloader(efi_mount):
 
 
 def flash_windows(device, iso, progress_cb=None, status_cb=None):
-    if not re.match(r"^/dev/(sd[a-z]|nvme[0-9]n[0-9])$", device):
+    if not re.match(r"^/dev/(sd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)$", device):
         raise ValueError(f"Invalid device path: {device}")
 
     def _emit(pct):
@@ -110,13 +111,29 @@ def flash_windows(device, iso, progress_cb=None, status_cb=None):
         run(["sudo", "wipefs", "-a", device])
         _emit(8)
 
-        sfdisk_script = f"""label: gpt
+        # Handle partition naming for NVMe/MMC vs SATA/USB
+        p_prefix = "p" if "nvme" in device or "mmcblk" in device else ""
+        efi = f"{device}{p_prefix}1"
+        data = f"{device}{p_prefix}2"
+
+        scheme = getattr(states, "partition_scheme", 0)  # 0=GPT, 1=MBR
+        if scheme == 0:
+            sfdisk_script = f"""label: gpt
 device: {device}
-{device}1 : size=512M, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
-{device}2 : type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7
+{efi} : size=512M, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+{data} : type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7
 """
+            scheme_name = "GPT"
+        else:
+            sfdisk_script = f"""label: dos
+device: {device}
+{efi} : size=512M, type=ef, bootable
+{data} : type=7
+"""
+            scheme_name = "MBR"
+
         _status(
-            f"Writing GPT partition table to {device}: 512MiB EFI (FAT32) + remainder data (NTFS)..."
+            f"Writing {scheme_name} partition table to {device}: 512MiB EFI (FAT32) + remainder data (NTFS)..."
         )
         subprocess.run(
             ["sudo", "sfdisk", device], input=sfdisk_script.encode(), check=True
@@ -127,8 +144,6 @@ device: {device}
         _status("udevadm settled")
         _emit(15)
 
-        efi = f"{device}1"
-        data = f"{device}2"
         _status(f"Partitions: EFI={efi}, data={data}")
 
         _status(f"Formatting {efi} as FAT32 with label BOOT...")

@@ -9,8 +9,8 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from lufus_py.drives import formatting
-from lufus_py.drives import states as st
+from lufus.drives import formatting
+from lufus.drives import states as st
 
 
 def _setup_common_monkeypatch(monkeypatch) -> None:

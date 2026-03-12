@@ -15,3 +15,5 @@ iso_path: str = ""
 DN = ""
 currentflash = 0
 language = "English"
+verify_hash = False
+expected_hash = ""

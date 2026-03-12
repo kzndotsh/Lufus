@@ -8,7 +8,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from lufus_py.writing.check_file_sig import check_iso_signature, check_sha256
+from lufus.writing.check_file_sig import check_iso_signature, check_sha256
 
 
 def test_check_sha256_returns_false_when_file_does_not_exist(tmp_path: Path) -> None:

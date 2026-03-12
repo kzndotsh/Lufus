@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
     QStatusBar,
     QToolButton,
     QSpacerItem,
+    QScrollArea,
 )
 from PyQt6.QtCore import (
     Qt,
@@ -84,7 +85,8 @@ class StdoutRedirector:
 class LogWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Log Window")
+        self._T = parent._T if parent else {}
+        self.setWindowTitle(self._T.get("log_window_title", "Log Window"))
         self.resize(650, 450)
         layout = QVBoxLayout()
         self.log_text = QTextEdit()
@@ -94,10 +96,10 @@ class LogWindow(QDialog):
         layout.addWidget(self.log_text)
 
         btn_row = QHBoxLayout()
-        btn_copy = QPushButton("Copy Log")
+        btn_copy = QPushButton(self._T.get("btn_copy_log", "Copy Log"))
         btn_copy.setFixedWidth(140)
         btn_copy.clicked.connect(self._copy_log)
-        btn_save = QPushButton("Save Log")
+        btn_save = QPushButton(self._T.get("btn_save_log", "Save Log"))
         btn_save.setFixedWidth(100)
         btn_save.clicked.connect(self._save_log)
         btn_row.addWidget(btn_copy)
@@ -116,14 +118,21 @@ class LogWindow(QDialog):
 
     def _save_log(self):
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save Log", "lufus_log.txt", "Text Files (*.txt);;All Files (*)"
+            self,
+            self._T.get("dlg_save_log_title", "Save Log"),
+            "lufus_log.txt",
+            "Text Files (*.txt);;All Files (*)",
         )
         if path:
             try:
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(self.log_text.toPlainText())
             except OSError as e:
-                QMessageBox.critical(self, "Save Failed", f"Failed to save log\n{e}")
+                QMessageBox.critical(
+                    self,
+                    self._T.get("save_failed_title", "Save Failed"),
+                    f'{self._T.get("save_failed_body", "Failed to save log")}\n{e}',
+                )
 
 
 class Notification(QFrame):
@@ -209,7 +218,8 @@ class AboutWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
-        self.setWindowTitle("About")
+        self._T = parent._T if parent else {}
+        self.setWindowTitle(self._T.get("about_window_title", "About"))
         self.resize(650, 450)
         layout = QVBoxLayout()
         self.about_text = QTextEdit()
@@ -227,13 +237,14 @@ class SettingsDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Settings")
+        self._T = parent._T if parent else {}
+        self.setWindowTitle(self._T.get("settings_window_title", "Settings"))
         self.setFixedSize(650, 450)
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(10)
 
-        lbl_lang = QLabel("Language")
+        lbl_lang = QLabel(self._T.get("settings_label_language", "Language"))
         lbl_lang.setStyleSheet("font-weight: normal; font-size: 9pt;")
 
         self.combo_language = QComboBox()
@@ -244,7 +255,7 @@ class SettingsDialog(QDialog):
             if current_lang in languages:
                 self.combo_language.setCurrentText(current_lang)
         else:
-            self.combo_language.addItem("No languages found")
+            self.combo_language.addItem(self._T.get("settings_no_languages", "No languages found"))
             self.combo_language.setEnabled(False)
 
         layout.addWidget(lbl_lang)
@@ -374,6 +385,29 @@ class WoeUSBWorker(QThread):
             self.finished.emit(False)
 
 
+class VerifyWorker(QThread):
+    """Worker thread for SHA256 verification"""
+
+    finished = pyqtSignal(bool)
+    progress = pyqtSignal(str)
+
+    def __init__(self, iso_path: str, expected_hash: str):
+        super().__init__()
+        self.iso_path = iso_path
+        self.expected_hash = expected_hash
+
+    def run(self):
+        try:
+            from lufus.writing.check_file_sig import check_sha256
+
+            self.progress.emit(f"Verifying SHA256 checksum for {self.iso_path}...")
+            result = check_sha256(self.iso_path, self.expected_hash)
+            self.finished.emit(result)
+        except Exception as e:
+            self.progress.emit(f"Verification error: {str(e)}")
+            self.finished.emit(False)
+
+
 class lufus(QMainWindow):
     def __init__(self, usb_devices=None):
         super().__init__()
@@ -386,8 +420,9 @@ class lufus(QMainWindow):
         self._T = load_translations(self.current_language)
 
         self.setWindowTitle(self._T.get("window_title", "lufus"))
-        self.setFixedSize(640, 690)
+        self.setFixedSize(640, 850)
         self.flash_worker = None
+        self.verify_worker = None
         self.log_window = None
         self.about_window = None
         self.log_entries = []
@@ -437,8 +472,7 @@ class lufus(QMainWindow):
                 border-radius: 6px;
                 padding: 4px 6px;
                 background-color: white;
-                min-height: 24px;
-                max-height: 24px;
+                min-height: 28px;
                 font-size: 9pt;
                 selection-background-color: #0078D7;
             }
@@ -455,11 +489,9 @@ class lufus(QMainWindow):
                 background-color: #E1E1E1;
                 border: 1px solid #A0A0A0;
                 border-radius: 6px;
-                padding: 4px 15px;
-                min-height: 20px;
-                max-height: 20px;
+                padding: 6px 15px;
+                min-height: 32px;
                 min-width: 100px;
-                max-width: 100px;
                 font-size: 9pt;
             }
             QPushButton:hover {
@@ -478,11 +510,9 @@ class lufus(QMainWindow):
                 background-color: #E1E1E1;
                 border: 1px solid #A0A0A0;
                 border-radius: 6px;
-                min-height: 20px;
-                max-height: 20px;
+                min-height: 32px;
                 min-width: 100px;
-                max-width: 100px;
-                padding: 4px 15px;
+                padding: 6px 15px;
                 font-size: 9pt;
             }
             #btnStart:hover {
@@ -618,9 +648,21 @@ class lufus(QMainWindow):
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(0)
+        outer_layout = QVBoxLayout(central_widget)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        scroll_content = QWidget()
+        main_layout = QVBoxLayout(scroll_content)
+        main_layout.setSpacing(GROUP_SPACING)
         main_layout.setContentsMargins(15, 10, 15, 10)
+        
+        scroll.setWidget(scroll_content)
+        outer_layout.addWidget(scroll)
 
         main_layout.addLayout(
             self.create_header(
@@ -675,6 +717,7 @@ class lufus(QMainWindow):
         self.combo_image_option = QComboBox()
         self.combo_image_option.addItem(self._T.get("combo_image_windows", "Windows"))
         self.combo_image_option.addItem(self._T.get("combo_image_linux", "Linux"))
+        self.combo_image_option.addItem(self._T.get("combo_image_other", "Other"))
         self.combo_image_option.addItem(
             self._T.get("combo_image_format", "Format Only")
         )
@@ -735,7 +778,8 @@ class lufus(QMainWindow):
         self.lbl_fs.setStyleSheet("font-weight: normal; font-size: 9pt;")
         self.combo_fs = QComboBox()
         self.all_fs_options = ["NTFS", "FAT32", "exFAT", "ext4", "UDF"]
-        self.combo_fs.addItems(self.all_fs_options)
+        # Initially only show Windows-compatible options as app defaults to Windows mode
+        self.combo_fs.addItems(["NTFS", "FAT32", "exFAT"])
         self.combo_fs.currentTextChanged.connect(self.updateFS)
 
         self.lbl_cluster = QLabel(self._T.get("lbl_cluster_size", "Cluster Size"))
@@ -797,12 +841,23 @@ class lufus(QMainWindow):
         bad_blocks_row.addWidget(self.combo_badblocks)
         bad_blocks_row.addStretch()
 
+        self.chk_verify = QCheckBox(self._T.get("chk_verify_hash", "Verify SHA256 Checksum"))
+        self.chk_verify.stateChanged.connect(self.update_verify_hash)
+        self.input_hash = QLineEdit()
+        self.input_hash.setPlaceholderText("Enter expected SHA256 hash here...")
+        self.input_hash.setEnabled(False)
+        self.input_hash.textChanged.connect(self.update_expected_hash)
+
         chk_layout = QVBoxLayout()
         chk_layout.setSpacing(6)
         chk_layout.addWidget(self.chk_quick)
         chk_layout.addWidget(self.chk_extended)
         chk_layout.addLayout(bad_blocks_row)
+        chk_layout.addWidget(self.chk_verify)
+        chk_layout.addWidget(self.input_hash)
         main_layout.addLayout(chk_layout)
+
+        main_layout.addStretch()
 
         main_layout.addSpacing(16)
 
@@ -850,11 +905,11 @@ class lufus(QMainWindow):
 
         self.btn_start = QPushButton(self._T.get("btn_start", "Start"))
         self.btn_start.setObjectName("btnStart")
-        self.btn_start.setFixedSize(100, 50)
+        self.btn_start.setMinimumHeight(40)
         self.btn_start.clicked.connect(self.start_process)
 
         self.btn_cancel = QPushButton(self._T.get("btn_cancel", "Cancel"))
-        self.btn_cancel.setFixedSize(100, 50)
+        self.btn_cancel.setMinimumHeight(40)
         self.btn_cancel.clicked.connect(self.cancel_process)
 
         btn_layout = QHBoxLayout()
@@ -863,12 +918,13 @@ class lufus(QMainWindow):
         btn_layout.addWidget(self.btn_cancel)
 
         bottom_controls = QHBoxLayout()
+        bottom_controls.setContentsMargins(15, 10, 15, 10)
         bottom_controls.setSpacing(10)
         bottom_controls.addLayout(icons_layout, 1)
         bottom_controls.addLayout(btn_layout)
-        main_layout.addLayout(bottom_controls)
-
-        central_widget.setLayout(main_layout)
+        
+        # Add bottom_controls to outer_layout, not main_layout
+        outer_layout.addLayout(bottom_controls)
 
         self.statusBar = QStatusBar()
         self.setStatusBar(self.statusBar)
@@ -956,13 +1012,23 @@ class lufus(QMainWindow):
 
     def _update_filesystem_options(self):
         self.combo_fs.blockSignals(True)
-        if states.image_option == 1:
+        if states.image_option == 1:  # Linux
             self.combo_fs.clear()
-            self.combo_fs.addItem("UDF")
-        elif states.image_option == 0:
+            self.combo_fs.addItems(["ext4", "UDF"])
+            self.combo_fs.setCurrentText("ext4")
+        elif states.image_option == 0:  # Windows
+            self.combo_fs.clear()
+            # Windows only supports FAT32/exFAT/NTFS
+            self.combo_fs.addItems(["NTFS", "FAT32", "exFAT"])
+            self.combo_fs.setCurrentText("NTFS")
+        elif states.image_option == 2:  # Any Install
             self.combo_fs.clear()
             self.combo_fs.addItems(self.all_fs_options)
-            self.combo_fs.setCurrentText("NTFS")
+            self.combo_fs.setCurrentText("FAT32")
+        elif states.image_option == 3:  # Format Only
+            self.combo_fs.clear()
+            self.combo_fs.addItems(self.all_fs_options)
+            self.combo_fs.setCurrentText("FAT32")
         self.combo_fs.blockSignals(False)
         self.updateFS()
 
@@ -970,7 +1036,7 @@ class lufus(QMainWindow):
         self.combo_flash.blockSignals(True)
         self.combo_flash.clear()
 
-        if states.image_option == 1:
+        if states.image_option == 1:  # Linux
             self.combo_flash.addItems(
                 [
                     self._T.get("combo_flash_dd", "DD"),
@@ -978,7 +1044,7 @@ class lufus(QMainWindow):
                 ]
             )
             self.combo_flash.setCurrentText(self._T.get("combo_flash_dd", "DD"))
-        elif states.image_option == 0:
+        elif states.image_option == 0:  # Windows
             self.combo_flash.addItems(
                 [
                     self._T.get("combo_flash_iso", "ISO"),
@@ -987,7 +1053,14 @@ class lufus(QMainWindow):
                 ]
             )
             self.combo_flash.setCurrentText(self._T.get("combo_flash_iso", "ISO"))
-        elif states.image_option == 2:
+        elif states.image_option == 2:  # Any Install
+            self.combo_flash.addItems(
+                [
+                    self._T.get("combo_flash_dd", "DD"),
+                ]
+            )
+            self.combo_flash.setCurrentText(self._T.get("combo_flash_dd", "DD"))
+        elif states.image_option == 3:  # Format Only
             self.combo_flash.addItems([self._T.get("combo_flash_none", "None")])
             self.combo_flash.setCurrentText(self._T.get("combo_flash_none", "None"))
         self.combo_flash.blockSignals(False)
@@ -1034,6 +1107,16 @@ class lufus(QMainWindow):
             f"Bad block check: {'enabled' if self.chk_badblocks.isChecked() else 'disabled'}"
         )
 
+    def update_verify_hash(self):
+        states.verify_hash = self.chk_verify.isChecked()
+        self.input_hash.setEnabled(states.verify_hash)
+        self.log_message(
+            f"SHA256 verification: {'enabled' if states.verify_hash else 'disabled'}"
+        )
+
+    def update_expected_hash(self, text):
+        states.expected_hash = text.strip()
+
     def _check_clipboard(self):
         text = QApplication.clipboard().text().strip()
         if text == self._last_clipboard:
@@ -1059,7 +1142,8 @@ class lufus(QMainWindow):
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()
-            if any(url.toLocalFile().lower().endswith(".iso") for url in urls):
+            supported = [".iso", ".dmg", ".img", ".bin", ".raw"]
+            if any(url.toLocalFile().lower().endswith(tuple(supported)) for url in urls):
                 event.acceptProposedAction()
                 return
         event.ignore()
@@ -1067,20 +1151,22 @@ class lufus(QMainWindow):
     def dragMoveEvent(self, event):
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()
-            if any(url.toLocalFile().lower().endswith(".iso") for url in urls):
+            supported = [".iso", ".dmg", ".img", ".bin", ".raw"]
+            if any(url.toLocalFile().lower().endswith(tuple(supported)) for url in urls):
                 event.acceptProposedAction()
                 return
         event.ignore()
 
     def dropEvent(self, event):
         urls = event.mimeData().urls()
-        iso_files = [
+        supported = [".iso", ".dmg", ".img", ".bin", ".raw"]
+        img_files = [
             url.toLocalFile()
             for url in urls
-            if url.toLocalFile().lower().endswith(".iso")
+            if url.toLocalFile().lower().endswith(tuple(supported))
         ]
-        if iso_files:
-            file_name = iso_files[0]
+        if img_files:
+            file_name = img_files[0]
             file_size = os.path.getsize(file_name)
             states.iso_path = file_name
             clean_name = file_name.split("/")[-1].split("\\")[-1]
@@ -1102,7 +1188,7 @@ class lufus(QMainWindow):
             self,
             self._T.get("dlg_select_image_title", "Select Image"),
             "",
-            self._T.get("dlg_select_image_filter", "ISO Files (*.iso)"),
+            self._T.get("dlg_select_image_filter", "Disk Images (*.iso *.dmg *.img *.bin *.raw);;All Files (*)"),
         )
         if file_name:
             file_size = os.path.getsize(file_name)
@@ -1218,6 +1304,13 @@ class lufus(QMainWindow):
                 self.flash_worker.terminate()
                 self.flash_worker.wait(2000)
                 self.log_message("Flash worker thread terminated")
+            
+            if hasattr(self, "verify_worker") and self.verify_worker and self.verify_worker.isRunning():
+                self.log_message("Sending terminate signal to verify worker thread", level="WARN")
+                self.verify_worker.terminate()
+                self.verify_worker.wait(2000)
+                self.log_message("Verify worker thread terminated")
+
             self.progress_bar.setValue(0)
             self.progress_bar.setFormat("")
             self.btn_start.setEnabled(True)
@@ -1255,175 +1348,134 @@ class lufus(QMainWindow):
         self.log_message(
             f"Start process triggered: image_option={states.image_option}, flash_mode={states.currentflash}, device={states.DN}"
         )
-        if states.image_option == 0:
+
+        # Basic validation
+        if states.image_option in [0, 1, 2]:
+            if (
+                not getattr(states, "iso_path", "")
+                or not Path(states.iso_path).exists()
+            ):
+                self.log_message("Start aborted: no valid image path set", level="WARN")
+                QMessageBox.warning(
+                    self,
+                    self._T.get("msgbox_no_image_title", "No Image"),
+                    self._T.get("msgbox_no_image_body", "Please select an image file"),
+                )
+                return
+
+            device_node = self.get_selected_mount_path()
+            if not device_node:
+                self.log_message("Start aborted: no USB device selected", level="WARN")
+                QMessageBox.warning(
+                    self,
+                    self._T.get("msgbox_no_device_title", "No Device"),
+                    self._T.get("msgbox_no_device_body", "Please select a USB device"),
+                )
+                return
+
+        if states.image_option in [0, 1, 2] and states.verify_hash:
+            # Check if hash is valid 64-char hex
+            h = states.expected_hash.strip().lower()
+            if len(h) != 64 or not all(c in "0123456789abcdef" for c in h):
+                self.log_message("Start aborted: invalid SHA256 hash format", level="WARN")
+                QMessageBox.warning(
+                    self,
+                    self._T.get("msgbox_invalid_hash_title", "Invalid Hash"),
+                    self._T.get("msgbox_invalid_hash_body", "The provided SHA256 hash is invalid."),
+                )
+                return
+
+            self.btn_start.setEnabled(False)
+            self.btn_cancel.setEnabled(True)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat(self._T.get("progress_verifying", "Verifying..."))
+
+            self.verify_worker = VerifyWorker(states.iso_path, states.expected_hash)
+            self.verify_worker.progress.connect(self.log_message)
+            self.verify_worker.finished.connect(self.on_verify_finished)
+            self.verify_worker.start()
+        else:
+            self.perform_flash()
+
+    def on_verify_finished(self, success: bool):
+        if success:
+            self.log_message("SHA256 verification successful, proceeding to flash")
+            self.perform_flash()
+        else:
+            self.log_message("SHA256 verification FAILED", level="ERROR")
+            QMessageBox.critical(
+                self,
+                self._T.get("msgbox_verify_fail_title", "Verification Failed"),
+                self._T.get("msgbox_verify_fail_body", "SHA256 checksum mismatch!"),
+            )
+            self.btn_start.setEnabled(True)
+            self.btn_cancel.setEnabled(False)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat("")
+
+    def perform_flash(self):
+        if states.image_option == 0:  # Windows
+            mount_path = self.get_selected_mount_path()
+            self.btn_start.setEnabled(False)
+            self.btn_cancel.setEnabled(True)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat(self._T.get("progress_preparing", "Preparing..."))
+            self.statusBar.showMessage(self._T.get("status_flashing", "Flashing..."), 0)
+
             if states.currentflash == 0:
-                if (
-                    not getattr(states, "iso_path", "")
-                    or not Path(states.iso_path).exists()
-                ):
-                    self.log_message(
-                        "Start aborted: no valid ISO path set", level="WARN"
-                    )
-                    QMessageBox.warning(
-                        self,
-                        self._T.get("msgbox_no_image_title", "No Image"),
-                        self._T.get(
-                            "msgbox_no_image_body", "Please select an ISO file"
-                        ),
-                    )
-                    return
-                mount_path = self.get_selected_mount_path()
-                if not mount_path:
-                    self.log_message(
-                        "Start aborted: no USB device selected", level="WARN"
-                    )
-                    QMessageBox.warning(
-                        self,
-                        self._T.get("msgbox_no_device_title", "No Device"),
-                        self._T.get(
-                            "msgbox_no_device_body", "Please select a USB device"
-                        ),
-                    )
-                    return
-
-                self.btn_start.setEnabled(False)
-                self.btn_cancel.setEnabled(True)
-                self.progress_bar.setValue(0)
-                self.progress_bar.setFormat(
-                    self._T.get("progress_preparing", "Preparing...")
-                )
-                self.statusBar.showMessage(
-                    self._T.get("status_flashing", "Flashing..."), 0
-                )
-
-                self.log_message(
-                    f"Launching FlashWorker: iso={states.iso_path}, target={mount_path}, mode=Windows ISO"
-                )
+                self.log_message(f"Launching FlashWorker: iso={states.iso_path}, target={mount_path}, mode=ISO")
                 self.flash_worker = FlashWorker(states.iso_path, mount_path)
-                self.flash_worker.progress.connect(
-                    lambda msg: self.statusBar.showMessage(msg, 0)
-                )
-                self.flash_worker.progress.connect(self.log_message)
-                self.flash_worker.progress_value.connect(self.progress_bar.setValue)
-                self.flash_worker.progress_value.connect(
-                    lambda v: self.progress_bar.setFormat(f"{v}%")
-                )
-                self.flash_worker.finished.connect(self.on_flash_finished)
-                self.flash_worker.start()
-
             elif states.currentflash == 1:
-                if (
-                    not getattr(states, "iso_path", "")
-                    or not Path(states.iso_path).exists()
-                ):
-                    self.log_message(
-                        "Start aborted: no valid ISO path set", level="WARN"
-                    )
-                    QMessageBox.warning(
-                        self,
-                        self._T.get("msgbox_no_image_title", "No Image"),
-                        self._T.get(
-                            "msgbox_no_image_body", "Please select an ISO file"
-                        ),
-                    )
-                    return
-                mount_path = self.get_selected_mount_path()
-                if not mount_path:
-                    self.log_message(
-                        "Start aborted: no USB device selected", level="WARN"
-                    )
-                    QMessageBox.warning(
-                        self,
-                        self._T.get("msgbox_no_device_title", "No Device"),
-                        self._T.get(
-                            "msgbox_no_device_body", "Please select a USB device"
-                        ),
-                    )
-                    return
-
-                self.btn_start.setEnabled(False)
-                self.btn_cancel.setEnabled(True)
-                self.progress_bar.setValue(0)
-                self.progress_bar.setFormat(
-                    self._T.get("progress_preparing", "Preparing...")
-                )
-                self.statusBar.showMessage(
-                    self._T.get("status_flashing", "Flashing..."), 0
-                )
-
-                self.log_message(
-                    f"Launching WoeUSBWorker: iso={states.iso_path}, target={mount_path}"
-                )
+                self.log_message(f"Launching WoeUSBWorker: iso={states.iso_path}, target={mount_path}")
                 self.flash_worker = WoeUSBWorker(states.iso_path, mount_path)
-                self.flash_worker.progress.connect(
-                    lambda msg: self.statusBar.showMessage(msg, 0)
-                )
-                self.flash_worker.progress.connect(self.log_message)
-                self.flash_worker.progress_value.connect(self.progress_bar.setValue)
-                self.flash_worker.progress_value.connect(
-                    lambda v: self.progress_bar.setFormat(f"{v}%")
-                )
-                self.flash_worker.finished.connect(self.on_flash_finished)
-                self.flash_worker.start()
-
-        elif states.image_option == 1:
-            if states.currentflash == 0:
-                if (
-                    not getattr(states, "iso_path", "")
-                    or not Path(states.iso_path).exists()
-                ):
-                    self.log_message(
-                        "Start aborted: no valid ISO path set", level="WARN"
-                    )
-                    QMessageBox.warning(
-                        self,
-                        self._T.get("msgbox_no_image_title", "No Image"),
-                        self._T.get(
-                            "msgbox_no_image_body", "Please select an ISO file"
-                        ),
-                    )
-                    return
-                device_node = self.get_selected_mount_path()
-                if not device_node:
-                    self.log_message(
-                        "Start aborted: no USB device selected", level="WARN"
-                    )
-                    QMessageBox.warning(
-                        self,
-                        self._T.get("msgbox_no_device_title", "No Device"),
-                        self._T.get(
-                            "msgbox_no_device_body", "Please select a USB device"
-                        ),
-                    )
-                    return
-
-                self.btn_start.setEnabled(False)
-                self.btn_cancel.setEnabled(True)
-                self.progress_bar.setValue(0)
-                self.progress_bar.setFormat(
-                    self._T.get("progress_preparing", "Preparing...")
-                )
-                self.statusBar.showMessage(
-                    self._T.get("status_flashing", "Flashing..."), 0
-                )
-
-                self.log_message(
-                    f"Launching FlashWorker: iso={states.iso_path}, target={device_node}, mode=Linux dd"
-                )
-                self.flash_worker = FlashWorker(states.iso_path, device_node)
-                self.flash_worker.progress.connect(
-                    lambda msg: self.statusBar.showMessage(msg, 0)
-                )
-                self.flash_worker.progress.connect(self.log_message)
-                self.flash_worker.progress_value.connect(self.progress_bar.setValue)
-                self.flash_worker.progress_value.connect(
-                    lambda v: self.progress_bar.setFormat(f"{v}%")
-                )
-                self.flash_worker.finished.connect(self.on_flash_finished)
-                self.flash_worker.start()
             else:
-                pass
-        elif states.image_option == 2:
+                # Handle other flash modes if any
+                self.btn_start.setEnabled(True)
+                self.btn_cancel.setEnabled(False)
+                return
+
+            self.flash_worker.progress.connect(lambda msg: self.statusBar.showMessage(msg, 0))
+            self.flash_worker.progress.connect(self.log_message)
+            self.flash_worker.progress_value.connect(self.progress_bar.setValue)
+            self.flash_worker.progress_value.connect(lambda v: self.progress_bar.setFormat(f"{v}%"))
+            self.flash_worker.finished.connect(self.on_flash_finished)
+            self.flash_worker.start()
+
+        elif states.image_option == 1:  # Linux
+            device_node = self.get_selected_mount_path()
+            self.btn_start.setEnabled(False)
+            self.btn_cancel.setEnabled(True)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat(self._T.get("progress_preparing", "Preparing..."))
+            self.statusBar.showMessage(self._T.get("status_flashing", "Flashing..."), 0)
+
+            self.log_message(f"Launching FlashWorker: iso={states.iso_path}, target={device_node}, mode=Linux DD")
+            self.flash_worker = FlashWorker(states.iso_path, device_node)
+            self.flash_worker.progress.connect(lambda msg: self.statusBar.showMessage(msg, 0))
+            self.flash_worker.progress.connect(self.log_message)
+            self.flash_worker.progress_value.connect(self.progress_bar.setValue)
+            self.flash_worker.progress_value.connect(lambda v: self.progress_bar.setFormat(f"{v}%"))
+            self.flash_worker.finished.connect(self.on_flash_finished)
+            self.flash_worker.start()
+
+        elif states.image_option == 2:  # Any Install
+            device_node = self.get_selected_mount_path()
+            self.btn_start.setEnabled(False)
+            self.btn_cancel.setEnabled(True)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat(self._T.get("progress_preparing", "Preparing..."))
+            self.statusBar.showMessage(self._T.get("status_flashing", "Flashing..."), 0)
+
+            self.log_message(f"Launching FlashWorker: iso={states.iso_path}, target={device_node}, mode=Any DD")
+            self.flash_worker = FlashWorker(states.iso_path, device_node)
+            self.flash_worker.progress.connect(lambda msg: self.statusBar.showMessage(msg, 0))
+            self.flash_worker.progress.connect(self.log_message)
+            self.flash_worker.progress_value.connect(self.progress_bar.setValue)
+            self.flash_worker.progress_value.connect(lambda v: self.progress_bar.setFormat(f"{v}%"))
+            self.flash_worker.finished.connect(self.on_flash_finished)
+            self.flash_worker.start()
+
+        elif states.image_option == 3:  # Format Only
             self.btn_start.setEnabled(False)
             self.btn_cancel.setEnabled(True)
             self.progress_bar.setValue(10)
@@ -1437,14 +1489,12 @@ class lufus(QMainWindow):
             self.progress_bar.setFormat(self._T.get("progress_formatted", "Formatted"))
             fo.volumecustomlabel()
             self.progress_bar.setValue(80)
-            self.progress_bar.setFormat(
-                self._T.get("progress_label_changed", "Label Changed")
-            )
+            self.progress_bar.setFormat(self._T.get("progress_label_changed", "Label Changed"))
             fo.remount()
             self.progress_bar.setValue(100)
-            self.progress_bar.setFormat(
-                self._T.get("progress_mount_done", "Mount Done")
-            )
+            self.progress_bar.setFormat(self._T.get("progress_mount_done", "Mount Done"))
+            self.btn_start.setEnabled(True)
+            self.btn_cancel.setEnabled(False)
 
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""

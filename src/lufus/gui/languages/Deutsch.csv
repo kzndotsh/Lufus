@@ -1,82 +1,94 @@
 key,value
 window_title,lufus
-log_window_title,Protokoll
-btn_copy_log,Protokoll kopieren
-btn_save_log,Protokoll speichern
+log_window_title,lufus Protokoll
+about_window_title,Über
+settings_window_title,Einstellungen
+btn_copy_log,In Zwischenablage kopieren
+btn_save_log,Protokoll speichern...
 dlg_save_log_title,Protokoll speichern
 save_failed_title,Speichern fehlgeschlagen
-save_failed_body,Protokoll konnte nicht gespeichert werden
-about_window_title,Über lufus
-settings_window_title,Einstellungen
+save_failed_body,Protokoll konnte nicht gespeichert werden:
 settings_label_language,Sprache
 settings_no_languages,Keine Sprachen gefunden
 header_drive_properties,Laufwerkseigenschaften
+header_format_options,Formatierungsoptionen
+header_status,Status
 lbl_device,Gerät
-no_usb_found,Kein USB-Gerät gefunden
-tooltip_refresh,USB-Geräte aktualisieren
 lbl_boot_selection,Startauswahl
-btn_select,Auswählen
-lbl_image_option,Image-Option
-combo_image_windows,Windows
-combo_image_linux,Linux
-combo_image_format,Nur formatieren
+lbl_image_option,Abbild-Option
 lbl_partition_scheme,Partitionsschema
+lbl_target_system,Zielsystem
+lbl_volume_label,Laufwerksbezeichnung
+lbl_file_system,Dateisystem
+lbl_flash_option,Flash-Option
+lbl_cluster_size,Größe der Zuordnungseinheiten
+combo_image_windows,Standard-Windows-Installation
+combo_image_linux,Standard-Linux-Installation
+combo_image_other,Jede Installation (DD-Modus)
+combo_image_format,Nur Formatierung
 combo_partition_gpt,GPT
 combo_partition_mbr,MBR
-lbl_target_system,Zielsystem
-combo_target_uefi,UEFI
-combo_target_bios,BIOS
-header_format_options,Formatierungsoptionen
-lbl_volume_label,Volume-Label
-lbl_file_system,Dateisystem
-lbl_flash_option,Flash-Modus
-combo_flash_iso,ISO-Modus
-combo_flash_woe,WoeUSB-Modus
-combo_flash_ventoy,Ventoy
-combo_flash_dd,DD-Modus
-combo_flash_none,Kein Flash
-lbl_cluster_size,Clustergröße
-combo_cluster_4096,4096 Bytes
+combo_target_uefi,UEFI (ohne CSM)
+combo_target_bios,BIOS (oder UEFI-CSM)
+combo_cluster_4096,4096 Bytes (Standard)
 combo_cluster_8192,8192 Bytes
-chk_quick_format,Schnellformatierung
-chk_extended_label,Erweiterte Label- und Icon-Dateien erstellen
-chk_bad_blocks,Defekte Blöcke prüfen
 combo_badblocks_1pass,1 Durchgang
-header_status,Status
-tooltip_download,Download-Seite öffnen
+chk_quick_format,Schnellformatierung
+chk_extended_label,Erweiterte Bezeichnung und Symbole erstellen
+chk_bad_blocks,Auf defekte Blöcke prüfen
+chk_verify_hash,SHA256-Prüfsumme verifizieren
+lbl_expected_hash,Erwarteter SHA256:
+progress_verifying,Prüfsumme wird verifiziert...
+msgbox_verify_fail_title,Verifizierung fehlgeschlagen
+msgbox_verify_fail_body,SHA256-Prüfsumme stimmt nicht überein! Die Datei ist möglicherweise beschädigt.
+msgbox_invalid_hash_title,Ungültiger Hash
+msgbox_invalid_hash_body,Der angegebene SHA256-Hash ist ungültig.
+combo_flash_iso,ISO-Modus
+combo_flash_woe,Woe USB
+combo_flash_ventoy,Ventoy
+combo_flash_dd,DD
+combo_flash_none,Keine
+btn_select,AUSWAHL
+btn_start,START
+btn_cancel,ABBRECHEN
+tooltip_refresh,USB-Geräte aktualisieren (Strg+R)
+tooltip_download,Updates herunterladen
 tooltip_about,Über
 tooltip_settings,Einstellungen
-tooltip_log,Protokoll anzeigen
-btn_start,Start
-btn_cancel,Abbrechen
+tooltip_log,Protokoll
 status_ready,Bereit
-status_scanning,USB-Geräte werden gesucht...
-status_scan_failed,USB-Scan fehlgeschlagen
-status_flashing,Schreibe Image auf USB...
-msgbox_usb_found_title,USB-Geräte gefunden
-msgbox_usb_found_body,USB-Geräte wurden erkannt.
-msgbox_no_devices_title,Keine Geräte
-msgbox_no_devices_body,Keine USB-Geräte gefunden.
-msgbox_scan_error_title,Scan-Fehler
-msgbox_scan_error_body,Fehler beim Scannen nach USB-Geräten:
-msgbox_no_image_title,Kein Image ausgewählt
-msgbox_no_image_body,Bitte wählen Sie eine ISO-Datei aus.
-msgbox_no_device_title,Kein Gerät ausgewählt
-msgbox_no_device_body,Bitte wählen Sie ein USB-Gerät aus.
-msgbox_success_title,Fertig
-msgbox_success_body,Flash-Vorgang erfolgreich abgeschlossen.
-msgbox_error_title,Fehler
-msgbox_error_body,Flash-Vorgang fehlgeschlagen.
-msgbox_cancel_title,Abbrechen bestätigen
-msgbox_cancel_body,Möchten Sie den Vorgang wirklich abbrechen?
-progress_complete,Fertig
-progress_failed,Fehlgeschlagen
+status_scanning,Suche nach USB-Geräten...
+status_scan_failed,Suche fehlgeschlagen
+status_flashing,Flashing...
 progress_preparing,Vorbereitung...
-progress_starting,Startet...
-progress_unmounted,Partitionen ausgehängt
-progress_formatted,Formatiert
-progress_label_changed,Label geändert
-progress_mount_done,Neu eingehängt
-about_content,lufus ist ein USB-Boot-Tool ähnlich wie Rufus, entwickelt für Linux.
-dlg_select_image_title,Image auswählen
-dlg_select_image_filter,ISO-Dateien (*.iso);;Alle Dateien (*)
+progress_complete,Abgeschlossen! 100%
+progress_failed,Fehlgeschlagen
+progress_starting,Startet.. 10%
+progress_unmounted,Laufwerk ausgehängt.. 20%
+progress_formatted,Laufwerk formatiert.. 60%
+progress_label_changed,Bezeichnung geändert.. 80%
+progress_mount_done,Einhängen fertig.. Abgeschlossen! 100%
+msgbox_cancel_title,Abbrechen
+msgbox_cancel_body,Sind Sie sicher, dass Sie abbrechen möchten?
+msgbox_success_title,Erfolg
+msgbox_success_body,USB-Laufwerk erfolgreich geflasht!
+msgbox_error_title,Fehler
+msgbox_error_body,Fehler beim Flashen des USB-Laufwerks.
+msgbox_no_image_title,Kein Abbild
+msgbox_no_image_body,Bitte wählen Sie zuerst eine gültige Installationsdatei aus.
+msgbox_no_device_title,Kein Gerät
+msgbox_no_device_body,Bitte wählen Sie zuerst ein USB-Gerät aus.
+msgbox_usb_found_title,Neues USB-Gerät gefunden
+msgbox_usb_found_body,USB-Gerät gefunden
+msgbox_no_devices_title,Keine Geräte
+msgbox_no_devices_body,"Es wurden keine USB-Laufwerke gefunden.
+Bitte schließen Sie ein Laufwerk an und versuchen Sie es erneut."
+msgbox_scan_error_title,Suchfehler
+msgbox_scan_error_body,Suche nach USB-Geräten fehlgeschlagen:
+no_usb_found,Keine USB-Geräte gefunden
+dlg_select_image_title,Abbild auswählen
+dlg_select_image_filter,"Abbilder (*.iso *.dmg *.img *.bin *.raw);;Alle Dateien (*)"
+about_content,"lufus ist ein in Python geschriebener USB-Image-Writer für Linux.
+Inspiriert vom originalen lufus-Tool für Windows.
+Version: 1.0.0
+GitHub: github.com/hog185/lufus"

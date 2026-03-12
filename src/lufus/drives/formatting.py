@@ -66,6 +66,8 @@ def unexpected():
 # UNMOUNT FUNCTION
 def unmount(drive: str = None):
     if not drive:
+        _, drive, _ = _get_mount_and_drive()
+    if not drive:
         print("Error: No drive node found. Cannot unmount.")
         return
     try:
@@ -97,6 +99,12 @@ def remount():
 ### DISK FORMATTING ###
 def volumecustomlabel():
     newlabel = states.new_label
+    # Sanitize label: allow only alphanumeric, spaces, hyphens, and underscores
+    import re
+    newlabel = re.sub(r'[^a-zA-Z0-9 \-_]', '', newlabel).strip()
+    if not newlabel:
+        newlabel = "USB_DRIVE"
+        
     _, drive, _ = _get_mount_and_drive()
     if not drive:
         print("Error: No drive node found. Cannot relabel.")
@@ -248,17 +256,35 @@ def dskformat():
         print("Error: No drive found. Cannot format.")
         return
 
+    # Ensure we have the raw device for partitioning
+    raw_device = _get_raw_device(drive)
+
     fs_type = states.currentFS
     clusters = cluster1
     sectors = sector
 
     # Build partition table based on scheme before formatting
-    _apply_partition_scheme(drive)
+    _apply_partition_scheme(raw_device)
+
+    # Sync kernel partition table
+    try:
+        subprocess.run(["partprobe", raw_device], check=False)
+        subprocess.run(["udevadm", "settle"], timeout=10, check=False)
+    except Exception:
+        pass
+
+    # Determine the first partition node
+    p_prefix = "p" if "nvme" in raw_device or "mmcblk" in raw_device else ""
+    partition = f"{raw_device}{p_prefix}1"
+
+    print(f"Formatting partition {partition}...")
 
     if fs_type == 0:
         try:
-            subprocess.run(["mkfs.ntfs", "-c", str(clusters), "-Q", drive], check=True)
-            print("success format to ntfs!")
+            subprocess.run(
+                ["mkfs.ntfs", "-c", str(clusters), "-Q", partition], check=True
+            )
+            print(f"success format {partition} to ntfs!")
         except FileNotFoundError:
             pkexecNotFound()
         except subprocess.CalledProcessError:
@@ -269,9 +295,9 @@ def dskformat():
     elif fs_type == 1:
         try:
             subprocess.run(
-                ["mkfs.vfat", "-s", str(sectors), "-F", "32", drive], check=True
+                ["mkfs.vfat", "-s", str(sectors), "-F", "32", partition], check=True
             )
-            print("success format to fat32!")
+            print(f"success format {partition} to fat32!")
         except FileNotFoundError:
             pkexecNotFound()
         except subprocess.CalledProcessError:
@@ -281,8 +307,8 @@ def dskformat():
             unexpected()
     elif fs_type == 2:
         try:
-            subprocess.run(["mkfs.exfat", "-b", str(clusters), drive], check=True)
-            print("success format to exFAT!")
+            subprocess.run(["mkfs.exfat", "-b", str(clusters), partition], check=True)
+            print(f"success format {partition} to exFAT!")
         except FileNotFoundError:
             pkexecNotFound()
         except subprocess.CalledProcessError:
@@ -292,8 +318,8 @@ def dskformat():
             unexpected()
     elif fs_type == 3:
         try:
-            subprocess.run(["mkfs.ext4", "-b", str(clusters), drive], check=True)
-            print("success format to ext4!")
+            subprocess.run(["mkfs.ext4", "-b", str(clusters), partition], check=True)
+            print(f"success format {partition} to ext4!")
         except FileNotFoundError:
             pkexecNotFound()
         except subprocess.CalledProcessError:

@@ -20,26 +20,34 @@ lbl_partition_scheme,مخطط التقسيم
 lbl_target_system,النظام الهدف
 lbl_volume_label,مسمى وحدة التخزين
 lbl_file_system,نظام الملفات
-lbl_flash_option,عدادات الحرق
+lbl_flash_option,إعدادات الحرق
 lbl_cluster_size,حجم العنقود
-combo_image_windows,تحميلة ويندوز
-combo_image_linux,تحميلة لينيكس
+combo_image_windows,تحميلة ويندوز قياسية
+combo_image_linux,تحميلة لينيكس قياسية
+combo_image_other,أي تحميلة (وضع DD)
 combo_image_format,وضع المحي فقط
 combo_partition_gpt,GPT
 combo_partition_mbr,MBR
-combo_target_uefi,UEFI (non CSM)
-combo_target_bios,BIOS (او UEFI-CSM)
-combo_cluster_4096,4096 bytes (افتراضي)
-combo_cluster_8192,8192 bytes
+combo_target_uefi,UEFI (بدون CSM)
+combo_target_bios,BIOS (أو UEFI-CSM)
+combo_cluster_4096,4096 بايت (افتراضي)
+combo_cluster_8192,8192 بايت
 combo_badblocks_1pass,دورة واحدة
-combo_flash_iso,Iso وضع
-combo_flash_woe,Woe USB وضع
-combo_flash_ventoy,Ventoy وضع
-combo_flash_dd,DD وضع
-combo_flash_none,لا وضع
 chk_quick_format,المحي السريع
 chk_extended_label,إنشاء تسمية موسعة وملفات أيقونات
 chk_bad_blocks,فحص الجهاز بحثا عن القطاعات التالفة
+chk_verify_hash,التحقق من بصمة SHA256
+lbl_expected_hash,:SHA256 البصمة المتوقعة
+progress_verifying,...جاري التحقق من البصمة
+msgbox_verify_fail_title,فشل التحقق
+msgbox_verify_fail_body,!بصمة SHA256 غير متطابقة! قد يكون الملف تالفاً
+msgbox_invalid_hash_title,بصمة غير صالحة
+msgbox_invalid_hash_body,.بصمة SHA256 المقدمة غير صالحة
+combo_flash_iso,ISO وضع
+combo_flash_woe,Woe USB وضع
+combo_flash_ventoy,Ventoy وضع
+combo_flash_dd,DD وضع
+combo_flash_none,بدون وضع
 btn_select,اختار
 btn_start,ابدأ
 btn_cancel,إلغاء
@@ -49,10 +57,10 @@ tooltip_about,عن البرنامج
 tooltip_settings,الأعدادات
 tooltip_log,السجلات
 status_ready,جاهز
-status_scanning,يتم العثور علي جهاز ال USB...
+status_scanning,جاري البحث عن أجهزة الـ USB...
 status_scan_failed,فشل البحث
-status_flashing,يتم الحرق...
-progress_preparing,يتم التجهيز...
+status_flashing,...جاري الحرق
+progress_preparing,...جاري التجهيز
 progress_complete,100% !تم اكتمال العملية بنجاح
 progress_failed,فشلت العملية
 progress_starting,.. 10% بدأت العملية
@@ -61,29 +69,26 @@ progress_formatted,يتم المحي و تهيئة القرص.. 60%
 progress_label_changed,تم تغيير التسمية.. 80%
 progress_mount_done,تم تجهيز القرص بنجاح! 100%
 msgbox_cancel_title,إلغاء
-msgbox_cancel_body,هل تريد إلغاء العملية?
+msgbox_cancel_body,هل تريد إلغاء العملية؟
 msgbox_success_title,تمت العملية بنجاح
-msgbox_success_body,تم حرق فلاش الUSB بنجاح!
+msgbox_success_body,!تم حرق فلاش الـ USB بنجاح
 msgbox_error_title,خطأ
-msgbox_error_body,فشلت عملية حرق الUSB.
-msgbox_no_image_title,لا يوجد ملف الايزو
-msgbox_no_image_body,يرجى اختيار ملف ايزو صالح أولاً.
+msgbox_error_body,.فشلت عملية حرق الـ USB
+msgbox_no_image_title,لا يوجد ملف صورة
+msgbox_no_image_body,.يرجى اختيار ملف تثبيت صالح أولاً
 msgbox_no_device_title,لا يوجد جهاز
-msgbox_no_device_body,يرجى اختيار جهاز USB أولاً.
+msgbox_no_device_body,.يرجى اختيار جهاز USB أولاً
 msgbox_usb_found_title,تم العثور على جهاز USB جديد
 msgbox_usb_found_body,تم العثور على جهاز USB
 msgbox_no_devices_title,لا توجد أجهزة
-msgbox_no_devices_body,"لم يتم العثور على أي فلاشات USB.
-
-يرجى توصيل الجهاز والمحاولة مرة أخرى.
+msgbox_no_devices_body,".لم يتم العثور على أي فلاشات USB
+.يرجى توصيل الجهاز والمحاولة مرة أخرى"
 msgbox_scan_error_title,حدث خطأ أثناء الفحص
-msgbox_scan_error_body,فشل الفحص بحثًا عن أجهزة الUSB:
-no_usb_found,لم يتم العثور علي اجهزو الUSB
-dlg_select_image_title,اختار ملف ايزو
-dlg_select_image_filter,ISO ملفات (*.iso);;كل الملفات (*)
-about_content,"لوفس (lufus) هو برنامج مصنوع بلغة بايثون لنظام تشغيل لنيكس.
-
-مستوحي من برنامج روفس (rufus) لنظام تشغيل ويندوز.
-
+msgbox_scan_error_body,:فشل الفحص بحثاً عن أجهزة الـ USB
+no_usb_found,لم يتم العثور علي أجهزة الـ USB
+dlg_select_image_title,اختار ملف الصورة
+dlg_select_image_filter,"Disk Images (*.iso *.dmg *.img *.bin *.raw);;كل الملفات (*)"
+about_content,"لوفس (lufus) هو برنامج مصنوع بلغة بايثون لنظام تشغيل لينيكس.
+مستوحى من برنامج روفس (rufus) الأصلي لنظام تشغيل ويندوز.
 الإصدار: 1.0.0
 GitHub: github.com/hog185/lufus"
