@@ -96,7 +96,7 @@ class TestGetUSBInfoForElse:
 
     def test_returns_empty_when_no_match(self, monkeypatch):
         monkeypatch.setattr(gui_module.psutil, "disk_partitions",
-                            lambda all=False: [])
+                            lambda*args, **kwargs: [])
         result = GetUSBInfo("/no/match")
         assert result == {}
 
