@@ -1,10 +1,7 @@
 import os
 import re
 import subprocess
-from lufus.writing.check_file_sig import _resolve_device_node
 from lufus.writing.check_file_sig import check_iso_signature
-from lufus.drives import find_usb as fu
-from lufus.drives import states
 from lufus.writing.detect_windows import is_windows_iso
 from lufus.writing.flash_windows import flash_windows
 from lufus.lufus_logging import get_logger
@@ -136,6 +133,8 @@ def FlashUSB(iso_path: str, raw_device: str, progress_cb=None, status_cb=None) -
                         last_pct = pct
                     if progress_cb:
                         progress_cb(pct)
+                else:
+                    log.warning("dd stderr: %s", line.decode("utf-8", errors="replace"))
 
         process.wait()
         _status(f"dd process exited with return code {process.returncode}")
