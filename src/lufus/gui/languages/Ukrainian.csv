@@ -73,17 +73,17 @@ msgbox_no_device_body,Будь ласка, спочатку виберіть USB
 msgbox_usb_found_title,Знайдено новий USB-пристрій
 msgbox_usb_found_body,USB-пристрій знайдено
 msgbox_no_devices_title,Немає пристроїв
-msgbox_no_devices_body,"USB-диски не знайдено.
+msgbox_no_devices_body,USB-диски не знайдено.
 
-Будь ласка, підключіть диск і повторіть спробу."
+Будь ласка, підключіть диск і повторіть спробу.
 msgbox_scan_error_title,Помилка сканування
 msgbox_scan_error_body,Не вдалося просканувати USB-пристрої:
 no_usb_found,USB-пристроїв не знайдено
 dlg_select_image_title,Вибрати образ диска
 dlg_select_image_filter,ISO-образи (*.iso);;Усі файли (*)
-about_content,"lufus — це інструмент запису образів дисків, написаний на Python для Linux.
+about_content,lufus — це інструмент запису образів дисків, написаний на Python для Linux.
 
 Натхненний оригінальним інструментом lufus для Windows.
 
 Версія: 1.0.0
-GitHub: github.com/hog185/lufus"
+GitHub: github.com/hog185/lufus
