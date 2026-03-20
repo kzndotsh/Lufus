@@ -7,6 +7,7 @@ url = "https://github.com/Hog185/Lufus"
 license.file = "LICENSE"
 author = "Hog185"
 author_email = "example@example.com"
+
 [tool.briefcase.app.lufus]
 formal_name = "Lufus"
 description = "A rufus clone written in Python and designed to work with Linux."
@@ -118,8 +119,8 @@ name = "lufus"
 version = "0.1.0"
 description = "Physical drive imaging and formatting utility written in Python"
 readme = "README.md"
-license = "MIT"
-requires-python = ">=3.8"
+license = {text = "MIT"}
+requires-python = ">=3.13"
 dependencies = [
     "psutil>=7.2.2",
     "pyqt6>=6.10.2",
