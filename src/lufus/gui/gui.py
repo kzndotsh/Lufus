@@ -6,6 +6,7 @@ import os
 import csv
 import platform
 import getpass
+import requests
 from typing import Dict, Any
 from platformdirs import user_config_dir
 from datetime import datetime
@@ -13,6 +14,7 @@ from glob import glob
 import urllib.parse
 import webbrowser
 from pathlib import Path
+from packaging import version
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -287,7 +289,6 @@ class AboutWindow(QDialog):
 
         self.setLayout(layout)
 
-
 class SettingsDialog(QDialog):
     # signals for when settings change :D
     language_changed = pyqtSignal(str)
@@ -492,7 +493,6 @@ class FlashWorker(QThread):
             # restore stdout :D
             sys.stdout = _saved_stdout
 
-
 # log level mapping for colors and methods
 _LOG_LEVELS = {
     "DEBUG":    ("debug",    "#888888"),
@@ -572,6 +572,9 @@ class lufus(QMainWindow):
         self.flash_worker = None
         self.log_message(f"UI scale factor: {self._S.f():.3f}  (base 96 DPI)")
         self._check_latest_download()
+
+        # check for new updates function call
+        QTimer.singleShot(100, self.get_latest_release)
 
     def _check_latest_download(self):
         if getattr(states, "iso_path", ""):
@@ -1599,7 +1602,7 @@ class lufus(QMainWindow):
             self.btn_cancel.setEnabled(True)
             self.progress_bar.setValue(0)
             self.progress_bar.setFormat(self._T.get("progress_verifying", "Verifying..."))
-# if you are reading this, fuck you
+            # if you are reading this, fuck you
             self.verify_worker = VerifyWorker(states.iso_path, states.expected_hash)
             self.verify_worker.progress.connect(self.log_message)
             self.verify_worker.flash_done.connect(self.on_verify_finished)
@@ -1796,7 +1799,42 @@ class lufus(QMainWindow):
         except Exception:
             # if pgrep fails assume agent might be present better to try :D
             return True
-
+    def get_latest_release(self):
+        owner = 'Hog185'
+        repo = 'Lufus'
+        url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+        current_version = "v0.1.0a1"
+        try:
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if version.parse(data['tag_name']) > version.parse(current_version):
+                    self.log_message(f"New version found: {data['tag_name']} > {current_version}", level="DEBUG")
+                    pass
+                else:
+                    self.log_message(f"Running latest release build: {data['tag_name']} <= {current_version}", level="INFO")
+                    return
+            else:
+                self.log_message(f"Couldn't get latest release, response: {response.status_code}", level="WARNING")
+                return
+        except Exception as e:
+            self.log_message(f"Update check failed: {e}", level="ERROR")
+            return
+        newupdate = QMessageBox(self)
+        newupdate.setWindowTitle("New Update Available!")
+        newupdate.setText(f"A new version ({data['tag_name']}) is available!")
+        newupdate.setInformativeText(f"Would you like to download {data['name']} now?")
+        download_btn = newupdate.addButton(QMessageBox.StandardButton.Apply)
+        download_btn.setText("Download Now")
+        later_btn = newupdate.addButton(QMessageBox.StandardButton.Discard)
+        later_btn.setText("Later")
+        newupdate.setIcon(QMessageBox.Icon.Information)
+        newupdate.exec()
+        if newupdate.clickedButton() == download_btn:
+            self.log_message(f"New update download button clicked", level="DEBUG")
+            webbrowser.open("https://github.com/Hog185/Lufus/releases")
+        else:
+            self.log_message(f"download later button clicked", level="DEBUG")
 
 if __name__ == "__main__":
     # setup high dpi scaling :3
