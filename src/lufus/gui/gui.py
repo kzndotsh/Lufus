@@ -619,7 +619,13 @@ class lufus(QMainWindow):
         except Exception:
             return
         if not isos:
+            # If no ISOs found, ensure we are in Format Only mode
+            self.combo_image_option.blockSignals(True)
+            self.combo_image_option.setCurrentIndex(3) # 3 is Format Only
+            self.combo_image_option.blockSignals(False)
+            self.update_image_option()
             return
+
         latest = isos[0]
         try:
             file_size = latest.stat().st_size
@@ -631,6 +637,31 @@ class lufus(QMainWindow):
         self.input_label.setText(clean_name.rsplit(".", 1)[0].upper())
         self.log_message(f"Latest download auto-loaded: {latest}")
         self.log_message(f"Image size: {file_size:,} bytes ({file_size / (1024**3):.2f} GiB)")
+        
+        # Automatically detect and select the correct image option #fuck you "any install bs"
+        self._auto_select_image_option(str(latest))
+
+    def _auto_select_image_option(self, iso_path: str):
+        """Detects if ISO is Windows or Linux and switches the combo box accordingly."""
+        from lufus.writing.detect_windows import is_windows_iso
+        
+        is_win = False
+        try:
+            is_win = is_windows_iso(iso_path)
+        except Exception as e:
+            self.log_message(f"Failed to auto-detect ISO type: {e}", level="WARN")
+            return
+
+        self.combo_image_option.blockSignals(True)
+        if is_win:
+            self.combo_image_option.setCurrentIndex(0) # Windows
+            self.log_message("Auto-detected ISO: Windows")
+        else:
+            self.combo_image_option.setCurrentIndex(1) # linux
+            self.log_message("Auto-detected ISO: Linux (or Other)")
+        self.combo_image_option.blockSignals(False)
+        
+        self.update_image_option()
 
     def _apply_styles(self) -> None:
         # load json values apply via qss all that yap is in the themes folder :3
@@ -1325,6 +1356,7 @@ class lufus(QMainWindow):
                     self.input_label.setText(clean_name.split(".")[0].upper())
                     self.log_message(f"Image loaded from clipboard: {local_file}")
                     self.log_message(f"Image size: {file_size:,} bytes ({file_size / (1024**3):.2f} GiB)")
+                    self._auto_select_image_option(local_file)
                     return
         text = clipboard.text().strip()
         if text == self._last_clipboard:
@@ -1340,6 +1372,7 @@ class lufus(QMainWindow):
             self.input_label.setText(clean_name.split(".")[0].upper())
             self.log_message(f"Image loaded from clipboard: {path}")
             self.log_message(f"Image size: {file_size:,} bytes ({file_size / (1024**3):.2f} GiB)")
+            self._auto_select_image_option(path)
 
     def dragEnterEvent(self, event):
         # accept drag of supported image files :D
@@ -1375,6 +1408,7 @@ class lufus(QMainWindow):
             self.input_label.setText(clean_name.split(".")[0].upper())
             self.log_message(f"Image selected via drag-and-drop: {file_name}")
             self.log_message(f"Image size: {file_size:,} bytes ({file_size / (1024**3):.2f} GiB)")
+            self._auto_select_image_option(file_name)
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -1396,6 +1430,7 @@ class lufus(QMainWindow):
             self.input_label.setText(clean_name.split(".")[0].upper())
             self.log_message(f"Image selected: {file_name}")
             self.log_message(f"Image size: {file_size:,} bytes ({file_size / (1024**3):.2f} GiB)")
+            self._auto_select_image_option(file_name)
 
     def show_log(self):
         # show log window with all entries :D
