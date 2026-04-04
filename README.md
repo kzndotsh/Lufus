@@ -41,5 +41,5 @@ or `mkdocs serve` to run a dev server.
 
 ## Contributing
 
-Feedback, testing, translation and other contributions are appreciated. Please join our discord server to get quick support on contributing and debugging.
+Feedback, testing, translations, and other contributions are appreciated. Please join our Discord server to get quick support on contributing and debugging.
 This is an open-source project maintained by volunteers and hobbyists. Response times for issues and pull requests may vary.
