@@ -107,3 +107,31 @@ status_format_in_progress,Форматування диска...
 status_format_complete,Форматування завершено!
 status_format_failed,Форматування НЕ ВДАЛОСЯ. Перевірте журнал вище для точної помилки.
 status_flash_error,Помилка запису: {error}
+acc_device,Вибір пристрою
+acc_device_desc,Виберіть USB-пристрій, який хочете використати
+acc_refresh,Оновити пристрої
+acc_refresh_desc,Сканувати підключені USB-пристрої
+acc_boot,Вибір завантажувального образу
+acc_boot_desc,Показує поточно вибраний файл образу
+acc_select,Огляд файлів образу
+acc_image_option,Вибір параметра образу
+acc_image_option_desc,Виберіть тип образу для запису: Windows, Linux, Інше або Тільки форматування
+acc_volume_label,Поле введення мітки тому
+acc_volume_label_desc,Введіть ім'я для USB-тому
+acc_filesystem,Вибір файлової системи
+acc_cluster,Вибір розміру кластера
+acc_flash_option,Вибір методу запису
+acc_quick_format,Прапорець швидкого форматування
+acc_extended_label,Прапорець створення розширеної мітки
+acc_bad_blocks,Прапорець перевірки на пошкоджені блоки
+acc_bad_blocks_passes,Вибір кількості проходів перевірки
+acc_verify_hash,Прапорець перевірки контрольної суми SHA256
+acc_hash_input,Поле введення очікуваного хешу SHA256
+acc_hash_input_desc,Вставте сюди очікуваний 64-символьний хеш SHA256
+acc_progress,Індикатор прогресу операції
+acc_start,Почати операцію
+acc_cancel,Скасувати операцію
+acc_website,Відкрити сайт Lufus
+acc_about,Про Lufus
+acc_settings,Відкрити налаштування
+acc_log,Відкрити вікно журналу
