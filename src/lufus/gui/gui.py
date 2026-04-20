@@ -7,8 +7,10 @@ import csv
 import platform
 import getpass
 import time
-import requests
+import urllib.request as _urllib_request
+import json as _json
 from typing import Dict, Any
+from packaging import version
 from platformdirs import user_config_dir
 from datetime import datetime
 from glob import glob
@@ -47,11 +49,10 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QFont, QFontDatabase, QIcon
 
-from lufus.drives import states
+from lufus import state
 from lufus.drives.autodetect_usb import UsbMonitor
 from lufus.lufus_logging import get_logger
 from lufus.gui.themes.icon_utils import svg_icon
-from lufus.writing.partition_scheme import PartitionScheme
 
 # themes live here :3
 THEME_DIR = Path(__file__).parent / 'themes'
@@ -317,7 +318,7 @@ class SettingsDialog(QDialog):
         if languages:
             # populate with available languages
             self.combo_language.addItems(languages)
-            current_lang = states.language if hasattr(states, "language") else "English"
+            current_lang = state.language if hasattr(state, "language") else "English"
             if current_lang in languages:
                 self.combo_language.setCurrentText(current_lang)
         else:
@@ -334,7 +335,7 @@ class SettingsDialog(QDialog):
         # add builtin and custom themes
         self.combo_theme.addItems(builtin)
         self.combo_theme.addItems(custom)
-        current_theme = getattr(states, "Theme", "Default")
+        current_theme = getattr(state, "Theme", "Default")
         for i in range(self.combo_theme.count()):
             # select current theme
             if self.combo_theme.itemText(i) == current_theme:
@@ -426,94 +427,68 @@ class VerifyWorker(QThread):
 
 
 class FlashWorker(QThread):
-    # worker thread for usb flashing operation meow
+    # worker thread that spawns flash_worker.py subprocess
     progress = pyqtSignal(int)
     status = pyqtSignal(str)
     flash_done = pyqtSignal(bool)
 
     def __init__(self, options: dict, t: dict):
         super().__init__()
-        # store options for flashing
         self.options = options
         self._T = t
+        self._process = None
 
     def run(self):
-        # run flash operation in background thread
-        _saved_stdout = sys.stdout
-        sys.stdout = sys.__stdout__
+        import tempfile, json, subprocess
+
+        # Write options to a temp file for the subprocess to read
+        opts_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+        json.dump(self.options, opts_file)
+        opts_file.close()
+
+        # Spawn flash_worker.py as subprocess
+        worker_script = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), '..', 'writing', 'flash_worker.py'
+        )
+        cmd = [sys.executable, worker_script, opts_file.name]
+
         try:
-            from lufus.drives import states, formatting as fo
-            from lufus.writing.flash_usb import FlashUSB
-            import glob
+            self._process = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1, start_new_session=True
+            )
 
-            options = self.options
-            # apply options to states :3
-            for key, value in options.items():
-                setattr(states, key, value)
+            for line in self._process.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith("PROGRESS:"):
+                    try:
+                        self.progress.emit(int(line[9:]))
+                    except ValueError:
+                        pass
+                elif line.startswith("STATUS:"):
+                    self.status.emit(line[7:])
 
-            device_node = options["device"]
-            states.DN = device_node
-            iso_path = options.get("iso_path", "")
-            flash_mode = options["currentflash"]
-            image_option = options["image_option"]
-
-            # unmount all partitions before flashing :D
-            self.status.emit(self._T.get("status_unmounting_all", "Unmounting all partitions on {device}...").format(device=device_node))
-            partitions = glob.glob(f"{device_node}*")
-            for part in partitions:
-                if part != device_node:  # don't unmount the device itself
-                    self.status.emit(self._T.get("status_unmounting", "Unmounting {part}...").format(part=part))
-                    fo.unmount(part)
-
-            # perform operation based on image option
-            if image_option == 3:  # Format Only
-                self.status.emit(self._T.get("status_format_starting", "Starting format operation..."))
-                self.progress.emit(10)
-                self.status.emit(self._T.get("status_format_in_progress", "Formatting drive..."))
-                self.progress.emit(50)
-                success = fo.dskformat(status_cb=self.status.emit)
-                if success:
-                    self.progress.emit(80)
-                    self.status.emit(self._T.get("status_remounting", "Remounting {part}...").format(part=part))
-                    fo.remount(part)
-                    self.progress.emit(100)
-                    self.status.emit(self._T.get("status_format_complete", "Format complete!"))
-                else:
-                    self.status.emit(self._T.get("status_format_failed", "Format FAILED. Check the log above for the exact error."))
-
-            elif image_option == 0:  # Windows
-                if flash_mode == 0:
-                    # iso mode for microslop windows
-                    # passing user selected filesystem
-                    #if states.currentFS == 0:
-                    #  scheme=PartitionScheme.WINDOWS_NTFS
-                    #elif states.currentFS == 1:
-                    #  scheme=PartitionScheme.SIMPLE_FAT32
-                    #elif states.currentFS == 2:
-                    #  scheme=PartitionScheme.WINDOWS_EXFAT
-                    #else:
-                    #  scheme=PartitionScheme.LINUX
-                    scheme=PartitionScheme.SIMPLE_FAT32
-                    success = FlashUSB(iso_path, device_node,
-                                       scheme,
-                                       progress_cb=self.progress.emit,
-                                       status_cb=self.status.emit)
-                else:
-                    success = False
-            else:
-                # other flash modes (Linux, Other)
-                success = FlashUSB(iso_path, device_node,
-                                   PartitionScheme.LINUX,
-                                   progress_cb=self.progress.emit,
-                                   status_cb=self.status.emit)
-
-            self.flash_done.emit(bool(success))
+            self._process.wait()
+            self.flash_done.emit(self._process.returncode == 0)
         except Exception as e:
             self.status.emit(self._T.get("status_flash_error", "Flash error: {error}").format(error=e))
             self.flash_done.emit(False)
         finally:
-            # restore stdout :D
-            sys.stdout = _saved_stdout
+            try:
+                os.unlink(opts_file.name)
+            except OSError:
+                pass
+
+    def terminate(self):
+        if self._process and self._process.poll() is None:
+            import signal
+            try:
+                os.killpg(os.getpgid(self._process.pid), signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                self._process.terminate()
+        super().terminate()
 
 # log level mapping for colors and methods
 _LOG_LEVELS = {
@@ -526,7 +501,7 @@ _LOG_LEVELS = {
 }
 
 
-class lufus(QMainWindow):
+class LufusWindow(QMainWindow):
     def __init__(self, usb_devices=None, scale: Scale = None):
         super().__init__()
         # main window initialization :3
@@ -539,7 +514,7 @@ class lufus(QMainWindow):
         self.monitor.device_list_updated.connect(self.update_usb_list)
 
         # load translations :D
-        self.current_language = getattr(states, "language", "English")
+        self.current_language = state.language
         self._T = load_translations(self.current_language)
 
         self.setWindowTitle(self._T.get("window_title", "lufus"))
@@ -591,7 +566,7 @@ class lufus(QMainWindow):
         self._clipboard_timer.start(500)
 
         # log startup info :D
-        self.log_message(f"lufus started (version: {states.version})")
+        self.log_message(f"lufus started (version: {state.version})")
         self.log_message(
             f"Python {sys.version.split()[0]} | {platform.system()} {platform.release()} {platform.machine()}"
         )
@@ -607,7 +582,7 @@ class lufus(QMainWindow):
         QTimer.singleShot(100, self.get_latest_release)
 
     def _check_latest_download(self):
-        if getattr(states, "iso_path", ""):
+        if state.iso_path:
             return
         try:
             result = subprocess.run(
@@ -629,7 +604,7 @@ class lufus(QMainWindow):
             file_size = latest.stat().st_size
         except Exception:
             return
-        states.iso_path = str(latest)
+        state.iso_path = str(latest)
         clean_name = latest.name
         self.combo_boot.setItemText(0, clean_name)
         self.input_label.setText(clean_name.rsplit(".", 1)[0].upper())
@@ -869,7 +844,7 @@ class lufus(QMainWindow):
         main_layout.addLayout(image_layout)
         main_layout.addSpacing(GROUP_SPACING)
 
-        # partition and target system selectors commented out :D
+        # TODO: Decide if partition scheme / target system selectors are needed for a future release
         #self.lbl_part = QLabel(self._T.get("lbl_partition_scheme", "Partition Scheme"))
         #self.combo_partition = QComboBox()
         #self.combo_partition.addItem(self._T.get("combo_partition_gpt", "GPT"))
@@ -1146,33 +1121,33 @@ class lufus(QMainWindow):
 
     def updateFS(self):
         # update filesystem selection in states :D
-        states.currentFS = self.combo_fs.currentIndex()
-        self.log_message(f"File system changed to: {self.combo_fs.currentText()} (index={states.currentFS})")
+        state.filesystem_index = self.combo_fs.currentIndex()
+        self.log_message(f"File system changed to: {self.combo_fs.currentText()} (index={state.filesystem_index})")
 
     def updateflash(self):
         # update flash mode selection in states :3
-        states.currentflash = self.combo_flash.currentIndex()
-        self.log_message(f"Flash option changed to: {self.combo_flash.currentText()} (index={states.currentflash})")
+        state.flash_mode = self.combo_flash.currentIndex()
+        self.log_message(f"Flash option changed to: {self.combo_flash.currentText()} (index={state.flash_mode})")
 
     def update_image_option(self):
         # update image option and refresh available filesystems and flash modes :D
-        states.image_option = self.combo_image_option.currentIndex()
-        self.log_message(f"Image option changed to: {self.combo_image_option.currentText()} (index={states.image_option})")
+        state.image_option = self.combo_image_option.currentIndex()
+        self.log_message(f"Image option changed to: {self.combo_image_option.currentText()} (index={state.image_option})")
         self._update_filesystem_options()
         self._update_flashing_options()
 
     def _update_filesystem_options(self):
         # change available filesystems based on image type :3
         self.combo_fs.blockSignals(True)
-        if states.image_option == 1:      # linux
+        if state.image_option == 1:      # linux
             self.combo_fs.clear(); self.combo_fs.addItems(["ext4", "UDF"]); self.combo_fs.setCurrentText("ext4")
-        elif states.image_option == 0:    # windows
+        elif state.image_option == 0:    # windows
             self.combo_fs.clear()
             #self.combo_fs.addItems(["NTFS", "FAT32", "exFAT"]); self.combo_fs.setCurrentText("NTFS")
             self.combo_fs.addItems(["FAT32"]); self.combo_fs.setCurrentText("FAT32")
-        elif states.image_option == 4:    # ventoy
+        elif state.image_option == 4:    # ventoy
             self.combo_fs.clear(); self.combo_fs.addItems(["exFAT", "FAT32"]); self.combo_fs.setCurrentText("exFAT")
-        elif states.image_option in (2, 3):
+        elif state.image_option in (2, 3):
             # other or format only :D
             self.combo_fs.clear(); self.combo_fs.addItems(self.all_fs_options); self.combo_fs.setCurrentText("FAT32")
         self.combo_fs.blockSignals(False)
@@ -1182,19 +1157,19 @@ class lufus(QMainWindow):
         # change available flash modes based on image type :3
         self.combo_flash.blockSignals(True)
         self.combo_flash.clear()
-        if states.image_option == 0:      # windows
+        if state.image_option == 0:      # windows
             self.combo_flash.addItems([self._T.get("combo_flash_iso", "ISO")])
             self.combo_flash.setCurrentText(self._T.get("combo_flash_iso", "ISO"))
-        elif states.image_option == 1:    # linux
+        elif state.image_option == 1:    # linux
             self.combo_flash.addItems([self._T.get("combo_flash_dd", "DD")])
             self.combo_flash.setCurrentText(self._T.get("combo_flash_dd", "DD"))
-        elif states.image_option == 2:    # other
+        elif state.image_option == 2:    # other
             self.combo_flash.addItems([self._T.get("combo_flash_dd", "DD")])
             self.combo_flash.setCurrentText(self._T.get("combo_flash_dd", "DD"))
-        elif states.image_option == 3:    # format only :D
+        elif state.image_option == 3:    # format only :D
             self.combo_flash.addItems([self._T.get("combo_flash_none", "None")])
             self.combo_flash.setCurrentText(self._T.get("combo_flash_none", "None"))
-        elif states.image_option == 4:    # ventoy
+        elif state.image_option == 4:    # ventoy
             self.combo_flash.addItems([self._T.get("combo_flash_ventoy", "Ventoy")])
             self.combo_flash.setCurrentText(self._T.get("combo_flash_ventoy", "Ventoy"))
         self.combo_flash.blockSignals(False)
@@ -1202,12 +1177,12 @@ class lufus(QMainWindow):
 
     # partition and target system updaters commented out :3
     #def update_partition_scheme(self):
-    #    states.partition_scheme = self.combo_partition.currentIndex()
-    #    self.log_message(f"Partition scheme changed to: {self.combo_partition.currentText()} (index={states.partition_scheme})")
+    #    state.partition_scheme = self.combo_partition.currentIndex()
+    #    self.log_message(f"Partition scheme changed to: {self.combo_partition.currentText()} (index={state.partition_scheme})")
 
     #def update_target_system(self):
-    #    states.target_system = self.combo_target.currentIndex()
-    #    self.log_message(f"Target system changed to: {self.combo_target.currentText()} (index={states.target_system})")
+    #    state.target_system = self.combo_target.currentIndex()
+    #    self.log_message(f"Target system changed to: {self.combo_target.currentText()} (index={state.target_system})")
 
     def _open_url(self):
         # open github url in browser :D
@@ -1236,22 +1211,22 @@ class lufus(QMainWindow):
 
     def update_new_label(self, current_text):
         # update volume label in states :3
-        states.new_label = current_text
+        state.new_label = current_text
         self.log_message(f"Volume label set to: {current_text!r}")
 
     def update_cluster_size(self):
         # update cluster size selection :D
-        states.cluster_size = self.combo_cluster.currentIndex()
-        self.log_message(f"Cluster size changed to: {self.combo_cluster.currentText()} (index={states.cluster_size})")
+        state.cluster_size = self.combo_cluster.currentIndex()
+        self.log_message(f"Cluster size changed to: {self.combo_cluster.currentText()} (index={state.cluster_size})")
 
     def update_QF(self):
         # update quick format setting :3
-        states.QF = 0 if self.chk_quick.isChecked() else 1
+        state.quick_format = 0 if self.chk_quick.isChecked() else 1
         self.log_message(f"Quick format: {'enabled' if self.chk_quick.isChecked() else 'disabled'}")
 
     def update_create_extended(self):
         # update extended label creation setting :D
-        states.create_extended = 0 if self.chk_extended.isChecked() else 1
+        state.create_extended = 0 if self.chk_extended.isChecked() else 1
         self.log_message(f"Create extended label/icon files: {'enabled' if self.chk_extended.isChecked() else 'disabled'}")
 
     def _animate_widget(self, widget, show: bool, anim_attr: str):
@@ -1275,7 +1250,7 @@ class lufus(QMainWindow):
 
     def update_check_bad(self):
         # update bad blocks check setting and enable pass selector :3
-        states.check_bad = 0 if self.chk_badblocks.isChecked() else 1
+        state.check_bad = 0 if self.chk_badblocks.isChecked() else 1
         show = self.chk_badblocks.isChecked()
         self.combo_badblocks.setEnabled(show)
         self._animate_widget(self.combo_badblocks, show, "_anim_badblocks")
@@ -1283,14 +1258,14 @@ class lufus(QMainWindow):
 
     def update_verify_hash(self):
         # update sha256 verification setting :D
-        states.verify_hash = self.chk_verify.isChecked()
-        self.input_hash.setEnabled(states.verify_hash)
-        self._animate_widget(self.input_hash, states.verify_hash, "_anim_hash")
-        self.log_message(f"SHA256 verification: {'enabled' if states.verify_hash else 'disabled'}")
+        state.verify_hash = self.chk_verify.isChecked()
+        self.input_hash.setEnabled(state.verify_hash)
+        self._animate_widget(self.input_hash, state.verify_hash, "_anim_hash")
+        self.log_message(f"SHA256 verification: {'enabled' if state.verify_hash else 'disabled'}")
 
     def update_expected_hash(self, text):
         # store expected hash for verification :3
-        states.expected_hash = text.strip()
+        state.expected_hash = text.strip()
 
     def _load_latest_download_iso(self):
         # check downloads folder for the most recently modified iso :3
@@ -1302,7 +1277,7 @@ class lufus(QMainWindow):
             return
         latest = isos[0]
         file_size = latest.stat().st_size
-        states.iso_path = str(latest)
+        state.iso_path = str(latest)
         clean_name = latest.name
         self.combo_boot.setItemText(0, clean_name)
         self.input_label.setText(latest.stem.upper())
@@ -1321,7 +1296,7 @@ class lufus(QMainWindow):
                         return
                     self._last_clipboard = local_file
                     file_size = os.path.getsize(local_file)
-                    states.iso_path = local_file
+                    state.iso_path = local_file
                     clean_name = local_file.split("/")[-1].split("\\")[-1]
                     self.combo_boot.setItemText(0, clean_name)
                     self.input_label.setText(clean_name.split(".")[0].upper())
@@ -1336,7 +1311,7 @@ class lufus(QMainWindow):
         if path.lower().endswith(".iso") and Path(path).is_file():
             # auto load iso from clipboard :3
             file_size = os.path.getsize(path)
-            states.iso_path = path
+            state.iso_path = path
             clean_name = path.split("/")[-1].split("\\")[-1]
             self.combo_boot.setItemText(0, clean_name)
             self.input_label.setText(clean_name.split(".")[0].upper())
@@ -1371,7 +1346,7 @@ class lufus(QMainWindow):
             # load first dropped image file :3
             file_name = img_files[0]
             file_size = os.path.getsize(file_name)
-            states.iso_path = file_name
+            state.iso_path = file_name
             clean_name = file_name.split("/")[-1].split("\\")[-1]
             self.combo_boot.setItemText(0, clean_name)
             self.input_label.setText(clean_name.split(".")[0].upper())
@@ -1392,7 +1367,7 @@ class lufus(QMainWindow):
         if file_name:
             # load selected image file :3
             file_size = os.path.getsize(file_name)
-            states.iso_path = file_name
+            state.iso_path = file_name
             clean_name = file_name.split("/")[-1].split("\\")[-1]
             self.combo_boot.setItemText(0, clean_name)
             self.input_label.setText(clean_name.split(".")[0].upper())
@@ -1481,7 +1456,7 @@ class lufus(QMainWindow):
                 shutil.copy(src, sudo_dst)
             except Exception:
                 pass
-            states.theme = theme_name
+            state.theme = theme_name
             self._apply_styles()
             self.log_message(f"Theme changed to: {theme_name}")
             if self.about_window and self.about_window.isVisible():
@@ -1490,7 +1465,7 @@ class lufus(QMainWindow):
     def apply_language(self, language):
         # change language and update all ui text :D
         self.current_language = language
-        states.language = language
+        state.language = language
         self._T = load_translations(language)
         self._update_ui_text()
         self.log_message(f"Language changed to: {language}")
@@ -1632,14 +1607,14 @@ class lufus(QMainWindow):
 
     def start_process(self):
         # start flashing process with validation :3
-        states.DN = self.combo_device.currentData() or ""
+        state.device_node = self.combo_device.currentData() or ""
         self.log_message(
-            f"Start process triggered: image_option={states.image_option}, flash_mode={states.currentflash}, device={states.DN}"
+            f"Start process triggered: image_option={state.image_option}, flash_mode={state.flash_mode}, device={state.device_node}"
         )
 
-        if states.image_option in [0, 1, 2]:
+        if state.image_option in [0, 1, 2]:
             # validate image path exists :D
-            if not getattr(states, "iso_path", "") or not Path(states.iso_path).exists():
+            if not state.iso_path or not Path(state.iso_path).exists():
                 self.log_message("Start aborted: no valid image path set", level="WARN")
                 QMessageBox.warning(self, self._T.get("msgbox_no_image_title", "No Image"),
                                     self._T.get("msgbox_no_image_body", "Please select an image file"))
@@ -1653,9 +1628,9 @@ class lufus(QMainWindow):
                                 self._T.get("msgbox_no_device_body", "Please select a USB device"))
             return
 
-        if states.image_option in [0, 1, 2] and states.verify_hash:
+        if state.image_option in [0, 1, 2] and state.verify_hash:
             # validate sha256 hash format
-            h = states.expected_hash.strip().lower()
+            h = state.expected_hash.strip().lower()
             if len(h) != 64 or not all(c in "0123456789abcdef" for c in h):
                 self.log_message("Start aborted: invalid SHA256 hash format", level="WARN")
                 QMessageBox.warning(self, self._T.get("msgbox_invalid_hash_title", "Invalid Hash"),
@@ -1668,9 +1643,9 @@ class lufus(QMainWindow):
             self.progress_bar.setValue(0)
             self.progress_bar.setFormat(self._T.get("progress_verifying", "Verifying..."))
             self._flash_start_time = time.monotonic()
-            self._flash_total_bytes = os.path.getsize(states.iso_path) if Path(states.iso_path).exists() else 0
+            self._flash_total_bytes = os.path.getsize(state.iso_path) if Path(state.iso_path).exists() else 0
             # if you are reading this, fuck you
-            self.verify_worker = VerifyWorker(states.iso_path, states.expected_hash)
+            self.verify_worker = VerifyWorker(state.iso_path, state.expected_hash)
             self.verify_worker.progress.connect(self.log_message)
             self.verify_worker.int_progress.connect(self._update_speed_eta, Qt.ConnectionType.QueuedConnection)
             self.verify_worker.int_progress.connect(self.progress_bar.setValue, Qt.ConnectionType.QueuedConnection)
@@ -1700,20 +1675,20 @@ class lufus(QMainWindow):
     def perform_flash(self):
         # perform actual flash operation :D
         options = {
-            "iso_path": states.iso_path,
+            "iso_path": state.iso_path,
             "device": self.get_selected_mount_path(),
-            "image_option": states.image_option,
-            "currentflash": states.currentflash,
-            "currentFS": states.currentFS,
-            #"partition_scheme": states.partition_scheme,
-            #"target_system": states.target_system,
-            "cluster_size": states.cluster_size,
-            "QF": states.QF,
-            "create_extended": states.create_extended,
-            "check_bad": states.check_bad,
-            "new_label": states.new_label,
-            "verify_hash": states.verify_hash,
-            "expected_hash": states.expected_hash,
+            "image_option": state.image_option,
+            "flash_mode": state.flash_mode,
+            "filesystem_index": state.filesystem_index,
+            #"partition_scheme": state.partition_scheme,
+            #"target_system": state.target_system,
+            "cluster_size": state.cluster_size,
+            "quick_format": state.quick_format,
+            "create_extended": state.create_extended,
+            "check_bad": state.check_bad,
+            "new_label": state.new_label,
+            "verify_hash": state.verify_hash,
+            "expected_hash": state.expected_hash,
         }
 
         if os.geteuid() != 0:
@@ -1763,21 +1738,8 @@ class lufus(QMainWindow):
             self.log_message("Relaunching as root via pkexec for flash operation...")
             os.execvp(pkexec_path, cmd)
         else:
-            # already root start flash worker :D
-            iso_path = options.get("iso_path", "")
-            self._flash_start_time = time.monotonic()
-            self._flash_total_bytes = os.path.getsize(iso_path) if iso_path and Path(iso_path).exists() else 0
-            self.log_message(f"Starting flash thread: image_option={options['image_option']}, flash_mode={options['currentflash']}, device={options['device']}")
-            self.flash_worker = FlashWorker(options, self._T)
-            self.flash_worker.progress.connect(self.progress_bar.setValue, Qt.ConnectionType.QueuedConnection)
-            self.flash_worker.progress.connect(self._update_speed_eta, Qt.ConnectionType.QueuedConnection)
-            self.flash_worker.status.connect(self._on_flash_status, Qt.ConnectionType.QueuedConnection)
-            self.flash_worker.flash_done.connect(self.on_flash_finished, Qt.ConnectionType.QueuedConnection)
-            self.flash_worker.start()
-            self.btn_start.setEnabled(False)
-            self.btn_cancel.setEnabled(True)
-            self.progress_bar.setValue(0)
-            self.statusBar.showMessage(self._T.get("status_flashing", "Flashing..."), 0)
+            # already root start flash worker
+            self._start_flash_with_options(options)
 
     def _do_autoflash(self) -> None:
         # called after init when launched with flash now :3
@@ -1801,7 +1763,7 @@ class lufus(QMainWindow):
         iso_path = options.get("iso_path", "")
         self._flash_start_time = time.monotonic()
         self._flash_total_bytes = os.path.getsize(iso_path) if iso_path and Path(iso_path).exists() else 0
-        self.log_message(f"Starting flash: image_option={options['image_option']}, flash_mode={options['currentflash']}, device={options['device']}")
+        self.log_message(f"Starting flash: image_option={options['image_option']}, flash_mode={options['flash_mode']}, device={options['device']}")
         self.flash_worker = FlashWorker(options, self._T)
         self.flash_worker.progress.connect(self.progress_bar.setValue, Qt.ConnectionType.QueuedConnection)
         self.flash_worker.progress.connect(self._update_speed_eta, Qt.ConnectionType.QueuedConnection)
@@ -1953,11 +1915,11 @@ class lufus(QMainWindow):
         owner = 'Hog185'
         repo = 'Lufus'
         url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
-        current_version = states.version
+        current_version = state.version
         try:
-            response = requests.get(url, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
+            req = _urllib_request.urlopen(url, timeout=5)
+            if req.status == 200:
+                data = _json.loads(req.read().decode())
                 if version.parse(data['tag_name']) > version.parse(current_version):
                     self.log_message(f"New version found: {data['tag_name']} > {current_version}", level="DEBUG")
                     pass
@@ -1965,7 +1927,7 @@ class lufus(QMainWindow):
                     self.log_message(f"Running latest release build: {data['tag_name']} <= {current_version}", level="INFO")
                     return
             else:
-                self.log_message(f"Couldn't get latest release, response: {response.status_code}", level="WARNING")
+                self.log_message(f"Couldn't get latest release, response: {req.status}", level="WARNING")
                 return
         except Exception as e:
             self.log_message(f"Update check failed: {e}", level="ERROR")
@@ -2006,6 +1968,6 @@ if __name__ == "__main__":
             print(f"Error parsing USB devices: {e}")
 
     # create and show main window :D
-    window = lufus(usb_devices)
+    window = LufusWindow(usb_devices)
     window.show()
     sys.exit(app.exec()) # oink meow meow meow :3
